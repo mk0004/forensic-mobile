@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, Modal, Animated, Dimensions, TextInput as RNTextInput } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, ScrollView, Pressable, Modal, Dimensions, TextInput as RNTextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { CaseCard } from '@/components/ui/case-card';
 import { EditCaseDrawer } from '@/components/edit-case-drawer';
@@ -30,6 +30,30 @@ function EmptyIcon() {
     return (
         <Svg width={64} height={64} viewBox="0 0 24 24" fill="none">
             <Path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="#D1D5DB" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function FabPlusIcon() {
+    return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Path d="M12 5v14M5 12h14" stroke={AppColors.white} strokeWidth={2.5} strokeLinecap="round" />
+        </Svg>
+    );
+}
+
+function ActiveDotIcon() {
+    return (
+        <Svg width={8} height={8} viewBox="0 0 8 8">
+            <Circle cx={4} cy={4} r={4} fill={AppColors.success} />
+        </Svg>
+    );
+}
+
+function CompletedCheckIcon() {
+    return (
+        <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+            <Path d="M20 6L9 17l-5-5" stroke={AppColors.success} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
@@ -94,12 +118,15 @@ export default function InvestigativeCases() {
         }
     };
 
+    const activeCount = activeCases.length;
+    const completedCount = completedCasesData.length;
+
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
             <ScrollView
                 contentContainerStyle={{
                     paddingTop: insets.top,
-                    paddingBottom: insets.bottom + 40,
+                    paddingBottom: insets.bottom + 100,
                 }}
             >
                 {/* Header */}
@@ -110,16 +137,20 @@ export default function InvestigativeCases() {
                     paddingVertical: 14,
                     backgroundColor: AppColors.white,
                     gap: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F3F4F6',
                 }}>
                     <Pressable onPress={() => router.back()} hitSlop={8}>
                         <BackIcon />
                     </Pressable>
-                    <Text style={{ ...Typography.h5, color: AppColors.textPrimary, flex: 1 }}>
-                        Investigative Cases
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ ...Typography.h5, color: AppColors.textPrimary }}>
+                            Investigative Cases
+                        </Text>
+                    </View>
                     <View style={{
-                        backgroundColor: AppColors.primary + '15',
-                        borderRadius: 12,
+                        backgroundColor: AppColors.primary + '12',
+                        borderRadius: 10,
                         paddingHorizontal: 10,
                         paddingVertical: 4,
                     }}>
@@ -129,13 +160,55 @@ export default function InvestigativeCases() {
                     </View>
                 </View>
 
+                {/* Summary stats row */}
+                <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.md, paddingTop: 14, gap: 10 }}>
+                    <View style={{
+                        flex: 1,
+                        backgroundColor: AppColors.white,
+                        borderRadius: 12,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: '#E5E7EB',
+                        gap: 4,
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <ActiveDotIcon />
+                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_500Medium', color: '#6B7280' }}>
+                                Active
+                            </Text>
+                        </View>
+                        <Text style={{ fontSize: 22, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
+                            {activeCount}
+                        </Text>
+                    </View>
+                    <View style={{
+                        flex: 1,
+                        backgroundColor: AppColors.white,
+                        borderRadius: 12,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: '#E5E7EB',
+                        gap: 4,
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <CompletedCheckIcon />
+                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_500Medium', color: '#6B7280' }}>
+                                Completed
+                            </Text>
+                        </View>
+                        <Text style={{ fontSize: 22, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
+                            {completedCount}
+                        </Text>
+                    </View>
+                </View>
+
                 {/* Search + Filters */}
-                <View style={{ paddingHorizontal: Spacing.md, paddingTop: 14, gap: 12, backgroundColor: AppColors.white, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                <View style={{ paddingHorizontal: Spacing.md, paddingTop: 14, gap: 12 }}>
                     {/* Search bar */}
                     <View style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        backgroundColor: '#F4F4F4',
+                        backgroundColor: AppColors.white,
                         borderRadius: 12,
                         borderWidth: 1,
                         borderColor: '#E5E7EB',
@@ -169,7 +242,7 @@ export default function InvestigativeCases() {
                                     key={f}
                                     onPress={() => setActiveFilter(f)}
                                     style={{
-                                        backgroundColor: isActive ? AppColors.primary : 'transparent',
+                                        backgroundColor: isActive ? AppColors.primary : AppColors.white,
                                         borderRadius: 20,
                                         borderWidth: isActive ? 0 : 1,
                                         borderColor: '#E5E7EB',
@@ -191,7 +264,7 @@ export default function InvestigativeCases() {
                 </View>
 
                 {/* Cases list */}
-                <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, gap: 12 }}>
+                <View style={{ paddingHorizontal: Spacing.md, paddingTop: 14, gap: 10 }}>
                     {filteredCases.length > 0 ? (
                         filteredCases.map(c => (
                             <CaseCard
@@ -213,27 +286,44 @@ export default function InvestigativeCases() {
                     ) : (
                         <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
                             <EmptyIcon />
-                            <Text style={{ ...Typography.body, color: AppColors.border }}>
+                            <Text style={{ ...Typography.bodySmall, color: '#9CA3AF' }}>
                                 {search.trim() ? 'No cases match your search' : 'No cases yet'}
                             </Text>
-                            <Pressable
-                                onPress={() => router.push('/(doctor)/add-case')}
-                                style={({ pressed }) => ({
-                                    backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
-                                    borderRadius: 10,
-                                    paddingHorizontal: 20,
-                                    paddingVertical: 10,
-                                    marginTop: 4,
-                                })}
-                            >
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
-                                    + Add New Case
-                                </Text>
-                            </Pressable>
+                            <Text style={{ ...Typography.caption, color: '#D1D5DB', textAlign: 'center' }}>
+                                Tap the button below to create your first case
+                            </Text>
                         </View>
                     )}
                 </View>
             </ScrollView>
+
+            {/* Floating Action Button — New Case */}
+            <Pressable
+                onPress={() => router.push('/(doctor)/add-case')}
+                style={({ pressed }) => ({
+                    position: 'absolute',
+                    right: 20,
+                    bottom: insets.bottom + 24,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
+                    borderRadius: 16,
+                    paddingLeft: 14,
+                    paddingRight: 18,
+                    height: 52,
+                    gap: 8,
+                    shadowColor: AppColors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 12,
+                    elevation: 8,
+                })}
+            >
+                <FabPlusIcon />
+                <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
+                    New Case
+                </Text>
+            </Pressable>
 
             {/* Delete Confirmation Modal */}
             <Modal visible={deleteTarget !== null} transparent animationType="fade">

@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, Modal, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
-import { StatCard } from '@/components/ui/stat-card';
 import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
 import { TabSlideIn } from '@/components/tab-slide-in';
 import { BottomDrawer } from '@/components/bottom-drawer';
-import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, RequestIcon, ChevronRightIcon } from '@/components/model-icons';
+import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, ChevronRightIcon } from '@/components/model-icons';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 function BellIcon() {
     return (
@@ -31,6 +33,19 @@ function PlusIcon() {
                 d="M12 5v14M5 12h14"
                 stroke={AppColors.white}
                 strokeWidth={2.5}
+                strokeLinecap="round"
+            />
+        </Svg>
+    );
+}
+
+function PlusIcon2() {
+    return (
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+            <Path
+                d="M12 5v14M5 12h14"
+                stroke={AppColors.primary}
+                strokeWidth={2}
                 strokeLinecap="round"
             />
         </Svg>
@@ -112,13 +127,6 @@ const analysisModels = [
         hasLaunch: true,
         modelType: 'reconstruct',
     },
-    {
-        title: 'Request Custom Model',
-        description: 'Need a specific forensic tool? Describe your requirements and our team will build it.',
-        icon: RequestIcon,
-        hasLaunch: false,
-        modelType: null,
-    },
 ];
 
 export default function DoctorDashboard() {
@@ -140,7 +148,7 @@ export default function DoctorDashboard() {
                 <ScrollView
                     contentContainerStyle={{
                         paddingTop: insets.top,
-                        paddingBottom: insets.bottom + 100,
+                        paddingBottom: insets.bottom + 140,
                     }}
                 >
                     {/* Header */}
@@ -202,109 +210,264 @@ export default function DoctorDashboard() {
                         </View>
                     </View>
 
-                    {/* Welcome */}
-                    <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 4 }}>
-                        <Text style={{ ...Typography.h4, color: AppColors.textPrimary }}>Dashboard Overview</Text>
-                        <Text style={{ ...Typography.bodySmall, color: AppColors.border }}>
-                            Welcome back! Here's what's happening today.
-                        </Text>
-                    </View>
+                    {/* Stats */}
+                    <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md }}>
+                        <LinearGradient
+                            colors={['#1E2A5E', '#2D3F7A']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={{ borderRadius: 14, overflow: 'hidden' }}
+                        >
+                            <View style={{ flexDirection: 'row' }}>
+                                <Pressable
+                                    onPress={() => router.push('/(doctor)/active-cases')}
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+                                        alignItems: 'center',
+                                        paddingVertical: 16,
+                                        opacity: pressed ? 0.7 : 1,
+                                    })}
+                                >
+                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>15</Text>
+                                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Active</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(99,204,255,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                        <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
+                                            <Path d="M12 19V5M5 12l7-7 7 7" stroke="#63CCFF" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+                                        </Svg>
+                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#63CCFF' }}>+3</Text>
+                                    </View>
+                                </Pressable>
 
-                    {/* Stat cards - 2 in row */}
-                    <View
-                        style={{
-                            flexDirection: 'row',
-                            paddingHorizontal: Spacing.md,
-                            paddingTop: Spacing.md,
-                            gap: 12,
-                        }}
-                    >
-                        <StatCard
-                            title="Active Cases"
-                            value={15}
-                            variant="blue"
-                            onPress={() => router.push('/(doctor)/active-cases')}
-                        />
-                        <StatCard
-                            title="Evidence Items"
-                            value={120}
-                            variant="red"
-                            onPress={() => router.push('/(doctor)/evidence-items')}
-                        />
-                    </View>
+                                <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 14 }} />
 
-                    {/* Full-width stat */}
-                    <View style={{ paddingHorizontal: Spacing.md, paddingTop: 12 }}>
-                        <StatCard
-                            title="Completed Cases"
-                            value={45}
-                            variant="teal"
-                            fullWidth
-                            onPress={() => router.push('/(doctor)/completed-cases')}
-                        />
+                                <Pressable
+                                    onPress={() => router.push('/(doctor)/evidence-items')}
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+                                        alignItems: 'center',
+                                        paddingVertical: 16,
+                                        opacity: pressed ? 0.7 : 1,
+                                    })}
+                                >
+                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>120</Text>
+                                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Evidence</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(251,191,36,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#FBBF24' }} />
+                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#FBBF24' }}>20 new</Text>
+                                    </View>
+                                </Pressable>
+
+                                <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 14 }} />
+
+                                <Pressable
+                                    onPress={() => router.push('/(doctor)/completed-cases')}
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+                                        alignItems: 'center',
+                                        paddingVertical: 16,
+                                        opacity: pressed ? 0.7 : 1,
+                                    })}
+                                >
+                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>45</Text>
+                                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Completed</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(52,211,153,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                        <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
+                                            <Path d="M5 13l4 4L19 7" stroke="#34D399" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+                                        </Svg>
+                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#34D399' }}>80%</Text>
+                                    </View>
+                                </Pressable>
+                            </View>
+                        </LinearGradient>
                     </View>
 
                     {/* Quick Actions */}
                     <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 12 }}>
-                        <Text style={{ ...Typography.h5, color: AppColors.textPrimary }}>Quick Actions</Text>
+                        <Text style={{ ...Typography.caption, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 1, textTransform: 'uppercase' }}>
+                            Quick Actions
+                        </Text>
 
-                        {/* Add new Cases - filled */}
-                        <Pressable
-                            onPress={() => router.push('/(doctor)/add-case')}
-                            style={({ pressed }) => ({
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
-                                borderRadius: 12,
-                                borderCurve: 'continuous' as const,
-                                height: 52,
-                                gap: 8,
-                            })}
-                        >
-                            <PlusIcon />
-                            <Text style={{ ...Typography.button, color: AppColors.white }}>Add new Cases</Text>
-                        </Pressable>
+                        <View style={{ gap: 10 }}>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <Pressable
+                                    onPress={() => router.push('/(doctor)/add-case')}
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+                                        backgroundColor: pressed ? '#F8FAFC' : AppColors.white,
+                                        borderRadius: 16,
+                                        padding: 16,
+                                        alignItems: 'center',
+                                        gap: 10,
+                                        borderWidth: 1,
+                                        borderColor: '#E5E7EB',
+                                    })}
+                                >
+                                    <View style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 10,
+                                        backgroundColor: AppColors.primary + '12',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <PlusIcon2 />
+                                    </View>
+                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                        New Case
+                                    </Text>
+                                </Pressable>
 
-                        {/* Upload Evidence - outline */}
-                        <Pressable
-                            onPress={() => router.push('/(doctor)/upload-evidence')}
-                            style={({ pressed }) => ({
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
-                                borderRadius: 12,
-                                borderCurve: 'continuous' as const,
-                                borderWidth: 1.5,
-                                borderColor: AppColors.primary,
-                                height: 52,
-                                gap: 8,
-                            })}
-                        >
-                            <FolderIcon />
-                            <Text style={{ ...Typography.button, color: AppColors.primary }}>Upload Evidence</Text>
-                        </Pressable>
+                                <Pressable
+                                    onPress={() => router.push('/(doctor)/upload-evidence')}
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+                                        backgroundColor: pressed ? '#F8FAFC' : AppColors.white,
+                                        borderRadius: 16,
+                                        padding: 16,
+                                        alignItems: 'center',
+                                        gap: 10,
+                                        borderWidth: 1,
+                                        borderColor: '#E5E7EB',
+                                    })}
+                                >
+                                    <View style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 10,
+                                        backgroundColor: AppColors.primary + '12',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <FolderIcon />
+                                    </View>
+                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                        Add Evidence
+                                    </Text>
+                                </Pressable>
+                            </View>
 
-                        {/* Start Analysis - outline */}
-                        <Pressable
-                            onPress={() => setDrawerVisible(true)}
-                            style={({ pressed }) => ({
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
-                                borderRadius: 12,
-                                borderCurve: 'continuous' as const,
-                                borderWidth: 1.5,
-                                borderColor: AppColors.primary,
-                                height: 52,
-                                gap: 8,
-                            })}
-                        >
-                            <SparkleIcon />
-                            <Text style={{ ...Typography.button, color: AppColors.primary }}>Start Analysis</Text>
-                        </Pressable>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <Pressable
+                                    onPress={() => setDrawerVisible(true)}
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+                                        backgroundColor: pressed ? '#F8FAFC' : AppColors.white,
+                                        borderRadius: 16,
+                                        padding: 16,
+                                        alignItems: 'center',
+                                        gap: 10,
+                                        borderWidth: 1,
+                                        borderColor: '#E5E7EB',
+                                    })}
+                                >
+                                    <View style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 10,
+                                        backgroundColor: AppColors.primary + '12',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <SparkleIcon />
+                                    </View>
+                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                        Analyze Case
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={() => router.push('/(doctor)/investigative-cases')}
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+                                        backgroundColor: pressed ? '#F8FAFC' : AppColors.white,
+                                        borderRadius: 16,
+                                        padding: 16,
+                                        alignItems: 'center',
+                                        gap: 10,
+                                        borderWidth: 1,
+                                        borderColor: '#E5E7EB',
+                                    })}
+                                >
+                                    <View style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 10,
+                                        backgroundColor: AppColors.primary + '12',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                                            <Path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                                        </Svg>
+                                    </View>
+                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                        My Cases
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Case Activity */}
+                    <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ ...Typography.caption, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 1, textTransform: 'uppercase' }}>
+                                Recent Activity
+                            </Text>
+                            <Pressable onPress={() => router.push('/(doctor)/active-cases')} hitSlop={8}>
+                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>View All</Text>
+                            </Pressable>
+                        </View>
+
+                        <View style={{
+                            backgroundColor: AppColors.white,
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: '#E5E7EB',
+                            overflow: 'hidden',
+                        }}>
+                            {[
+                                { id: '#2024-0892', title: 'Digital Forgery Case', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '2h ago' },
+                                { id: '#2024-0891', title: 'Identity Verification', status: 'Completed', statusColor: AppColors.success, statusBg: '#DCFCE7', updated: '5h ago' },
+                                { id: '#2024-0890', title: 'Evidence Authentication', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '1d ago' },
+                            ].map((item, idx, arr) => (
+                                <Pressable
+                                    key={item.id}
+                                    onPress={() => router.push({
+                                        pathname: '/(doctor)/case-details' as any,
+                                        params: { id: item.id.replace('#', ''), title: item.title },
+                                    })}
+                                    style={({ pressed }) => ({
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        paddingHorizontal: 16,
+                                        paddingVertical: 14,
+                                        backgroundColor: pressed ? '#F8FAFC' : 'transparent',
+                                        borderBottomWidth: idx < arr.length - 1 ? 1 : 0,
+                                        borderBottomColor: '#F3F4F6',
+                                    })}
+                                >
+                                    <View style={{ flex: 1, gap: 2 }}>
+                                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                            {item.title}
+                                        </Text>
+                                        <Text style={{ ...Typography.caption, color: '#9CA3AF' }}>
+                                            {item.id} · {item.updated}
+                                        </Text>
+                                    </View>
+                                    <View style={{
+                                        backgroundColor: item.statusBg,
+                                        paddingVertical: 3,
+                                        paddingHorizontal: 8,
+                                        borderRadius: 6,
+                                    }}>
+                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: item.statusColor }}>
+                                            {item.status}
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                            ))}
+                        </View>
                     </View>
                 </ScrollView>
 
@@ -317,31 +480,7 @@ export default function DoctorDashboard() {
                 >
                     {analysisModels.map((model) => {
                         const Icon = model.icon;
-                        const isDashed = !model.hasLaunch;
-                        return isDashed ? (
-                            <View
-                                key={model.title}
-                                style={{
-                                    backgroundColor: AppColors.white,
-                                    borderRadius: 16,
-                                    borderCurve: 'continuous',
-                                    borderWidth: 1.5,
-                                    borderColor: '#E5E7EB',
-                                    borderStyle: 'dashed',
-                                    padding: 16,
-                                    gap: 10,
-                                    alignItems: 'center',
-                                }}
-                            >
-                                <Icon />
-                                <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
-                                    {model.title}
-                                </Text>
-                                <Text style={{ ...Typography.caption, color: '#6B7280', lineHeight: 18, textAlign: 'center' }}>
-                                    {model.description}
-                                </Text>
-                            </View>
-                        ) : (
+                        return (
                             <Pressable
                                 key={model.title}
                                 onPress={() => {
@@ -387,14 +526,6 @@ export default function DoctorDashboard() {
                             </Pressable>
                         );
                     })}
-
-                    {/* Footer link */}
-                    <Text style={{ textAlign: 'center', ...Typography.caption, color: '#6B7280', marginTop: 8 }}>
-                        Need more models? Visit the{' '}
-                        <Text style={{ color: AppColors.primary, textDecorationLine: 'underline' }}>
-                            Full Analysis Models Page
-                        </Text>
-                    </Text>
 
                     {/* Cancel button */}
                     <Pressable

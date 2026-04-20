@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, Image, Alert } from 'react-native';
+import { useState, useMemo, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, Image, Alert, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -43,55 +43,47 @@ function UserIcon() {
 export default function ResultsFaceRecognitionScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { imageUri, apiData } = useLocalSearchParams<{ imageUri: string; apiData: string }>();
+    const { imageUri, apiData, errorData } = useLocalSearchParams<{ imageUri: string; apiData: string; errorData: string }>();
     const [caseModalVisible, setCaseModalVisible] = useState(false);
+    const [origSize, setOrigSize] = useState({ w: 0, h: 0 });
+    const screenWidth = Dimensions.get('window').width - Spacing.md * 2;
+
+    useEffect(() => {
+        if (imageUri) {
+            Image.getSize(imageUri, (w, h) => setOrigSize({ w, h }), () => { });
+        }
+    }, [imageUri]);
+
+    const imageDisplayHeight = origSize.w > 0
+        ? (screenWidth / origSize.w) * origSize.h
+        : 250;
 
     // Parse API response
     const parsed = useMemo(() => {
         try {
             const raw = JSON.parse(apiData || '{}');
-            // /recognize response structure
-            const results = Array.isArray(raw) ? raw : (raw.results || [raw]);
-            return { results, raw };
+            // API returns: { identities: ["Name1", "Name2"] }
+            // or: { message: "No match found in database", identities: [] }
+            if (Array.isArray(raw.identities)) {
+                if (raw.identities.length === 0) {
+                    return { identities: [], raw, noMatch: true, noMatchMessage: raw.message || 'No match found in database' };
+                }
+                return { identities: raw.identities, raw, noMatch: false, noMatchMessage: '' };
+            }
+            // Fallback for unexpected format
+            return { identities: [], raw, noMatch: false, noMatchMessage: '' };
         } catch {
-            return { results: [], raw: {} };
+            return { identities: [], raw: {}, noMatch: false, noMatchMessage: '' };
         }
     }, [apiData]);
 
-    // Extract match data from API response
-    const matches = useMemo(() => {
-        if (parsed.results.length === 0) {
-            // Fallback mock data
-            return [
-                { identity: 'John Doe', distance: 0.23, threshold: 0.68, verified: true, model: 'ArcFace', faceRegion: { x: 120, y: 80, w: 200, h: 250 } },
-                { identity: 'James Smith', distance: 0.45, threshold: 0.68, verified: true, model: 'ArcFace', faceRegion: null },
-                { identity: 'Unknown #3847', distance: 0.62, threshold: 0.68, verified: false, model: 'ArcFace', faceRegion: null },
-            ];
-        }
-
-        return parsed.results.map((r: any) => {
-            const identity = r.identity || r.label || 'Unknown';
-            const distance = r.distance ?? r.score ?? 0;
-            const threshold = r.threshold ?? 0.68;
-            const verified = distance <= threshold;
-            const faceRegion = r.facial_area || r.face_region || r.source_region || null;
-            const model = r.model || 'ArcFace';
-            return { identity, distance, threshold, verified, model, faceRegion };
-        });
-    }, [parsed]);
-
-    const primaryMatch = matches[0];
-    const matchConfidence = primaryMatch
-        ? Math.max(0, Math.min(100, (1 - primaryMatch.distance / primaryMatch.threshold) * 100))
-        : 0;
-
-    // Facial landmark measurements (mock)
-    const landmarks = [
-        { label: 'Inter-ocular Distance', value: '63.2 mm' },
-        { label: 'Nose Width Ratio', value: '0.267' },
-        { label: 'Jaw Angle', value: '122.4°' },
-        { label: 'Face Symmetry', value: '96.1%' },
-    ];
+    const hasResults = parsed.identities.length > 0;
+    const knownIdentities = parsed.identities.filter((name: string) =>
+        !name.toLowerCase().includes('unknown')
+    );
+    const unknownIdentities = parsed.identities.filter((name: string) =>
+        name.toLowerCase().includes('unknown')
+    );
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -145,7 +137,7 @@ export default function ResultsFaceRecognitionScreen() {
                         }}>
                             <Image
                                 source={{ uri: imageUri }}
-                                style={{ width: '100%', height: 200, resizeMode: 'cover' }}
+                                style={{ width: '100%', height: imageDisplayHeight, resizeMode: 'contain' }}
                             />
                             <View style={{ padding: 10 }}>
                                 <Text style={{ ...Typography.caption, color: '#9CA3AF' }}>Uploaded Evidence</Text>
@@ -153,248 +145,311 @@ export default function ResultsFaceRecognitionScreen() {
                         </View>
                     )}
 
-                    {/* Primary Match Card */}
-                    {primaryMatch && (
+                    {/* Error State */}
+                    {errorData ? (
                         <View style={{
-                            backgroundColor: AppColors.white,
+                            backgroundColor: '#FEF2F2',
                             borderRadius: 16,
                             padding: 20,
                             borderWidth: 1,
-                            borderColor: '#E5E7EB',
-                            gap: 14,
+                            borderColor: '#FECACA',
+                            gap: 12,
+                            alignItems: 'center',
                         }}>
-                            <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                Primary Match
-                            </Text>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                                <View style={{
-                                    width: 56,
-                                    height: 56,
-                                    borderRadius: 28,
-                                    backgroundColor: '#F3F4F6',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}>
-                                    <UserIcon />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
-                                        {primaryMatch.identity}
-                                    </Text>
-                                    <Text style={{ ...Typography.caption, color: '#6B7280', marginTop: 2 }}>
-                                        Model: {primaryMatch.model} • Distance: {primaryMatch.distance.toFixed(4)}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            {/* Match confidence bar */}
-                            <View style={{ gap: 6 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={{ ...Typography.caption, color: '#6B7280' }}>Match Confidence</Text>
-                                    <Text style={{ ...Typography.caption, fontFamily: 'IBMPlexSans_600SemiBold', color: primaryMatch.verified ? AppColors.success : AppColors.error }}>
-                                        {matchConfidence.toFixed(1)}%
-                                    </Text>
-                                </View>
-                                <View style={{ height: 8, borderRadius: 4, backgroundColor: '#F3F4F6' }}>
-                                    <View style={{
-                                        height: 8,
-                                        borderRadius: 4,
-                                        backgroundColor: primaryMatch.verified ? AppColors.success : AppColors.error,
-                                        width: `${Math.min(100, matchConfidence)}%`,
-                                    }} />
-                                </View>
-                            </View>
-
                             <View style={{
-                                backgroundColor: primaryMatch.verified ? '#DCFCE7' : '#FEE2E2',
-                                paddingVertical: 6,
-                                paddingHorizontal: 12,
-                                borderRadius: 8,
-                                alignSelf: 'flex-start',
+                                width: 56,
+                                height: 56,
+                                borderRadius: 28,
+                                backgroundColor: '#FEE2E2',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                             }}>
-                                <Text style={{
-                                    fontSize: 12,
-                                    fontFamily: 'IBMPlexSans_600SemiBold',
-                                    color: primaryMatch.verified ? AppColors.success : AppColors.error,
-                                }}>
-                                    {primaryMatch.verified ? 'VERIFIED MATCH' : 'BELOW THRESHOLD'}
-                                </Text>
+                                <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                                    <Circle cx={12} cy={12} r={10} stroke={AppColors.error} strokeWidth={2} />
+                                    <Path d="M15 9l-6 6M9 9l6 6" stroke={AppColors.error} strokeWidth={2} strokeLinecap="round" />
+                                </Svg>
                             </View>
-                        </View>
-                    )}
-
-                    {/* Face Region */}
-                    {primaryMatch?.faceRegion && (
-                        <View style={{
-                            backgroundColor: AppColors.white,
-                            borderRadius: 16,
-                            padding: 16,
-                            borderWidth: 1,
-                            borderColor: '#E5E7EB',
-                            gap: 10,
-                        }}>
-                            <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                Face Region
+                            <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.error, textAlign: 'center' }}>
+                                Analysis Failed
                             </Text>
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                                {Object.entries(primaryMatch.faceRegion).map(([key, val]) => (
-                                    <View key={key} style={{
-                                        backgroundColor: '#F9FAFB',
-                                        paddingHorizontal: 10,
-                                        paddingVertical: 6,
-                                        borderRadius: 8,
-                                    }}>
-                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                            {key.toUpperCase()}
-                                        </Text>
-                                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                            {String(val)}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </View>
-                    )}
-
-                    {/* Facial Landmarks */}
-                    <View style={{
-                        backgroundColor: AppColors.white,
-                        borderRadius: 16,
-                        padding: 16,
-                        borderWidth: 1,
-                        borderColor: '#E5E7EB',
-                        gap: 12,
-                    }}>
-                        <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                            Facial Measurements
-                        </Text>
-                        {landmarks.map((lm) => (
-                            <View
-                                key={lm.label}
-                                style={{
-                                    flexDirection: 'row',
-                                    justifyContent: 'space-between',
-                                    paddingVertical: 8,
-                                    borderBottomWidth: 1,
-                                    borderBottomColor: '#F3F4F6',
-                                }}
+                            <Text style={{ ...Typography.bodySmall, color: '#991B1B', textAlign: 'center', lineHeight: 20 }}>
+                                {errorData}
+                            </Text>
+                            <Pressable
+                                onPress={() => router.back()}
+                                style={({ pressed }) => ({
+                                    backgroundColor: pressed ? '#DC2626' : AppColors.error,
+                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    paddingHorizontal: 24,
+                                    marginTop: 4,
+                                })}
                             >
-                                <Text style={{ ...Typography.bodySmall, color: '#6B7280' }}>{lm.label}</Text>
-                                <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                    {lm.value}
+                                <Text style={{ ...Typography.button, color: AppColors.white }}>
+                                    Try Again
                                 </Text>
-                            </View>
-                        ))}
-                    </View>
-
-                    {/* Similar Matches */}
-                    {matches.length > 1 && (
+                            </Pressable>
+                        </View>
+                    ) : parsed.noMatch ? (
+                        /* No Match Found State */
                         <View style={{
                             backgroundColor: AppColors.white,
                             borderRadius: 16,
-                            padding: 16,
+                            padding: 24,
                             borderWidth: 1,
                             borderColor: '#E5E7EB',
-                            gap: 10,
+                            gap: 12,
+                            alignItems: 'center',
                         }}>
-                            <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                Other Matches
+                            <View style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 28,
+                                backgroundColor: '#FEF3C7',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}>
+                                <UserIcon />
+                            </View>
+                            <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary, textAlign: 'center' }}>
+                                No Match Found
                             </Text>
-                            {matches.slice(1).map((m, i) => {
-                                const sim = Math.max(0, Math.min(100, (1 - m.distance / m.threshold) * 100));
-                                return (
-                                    <View
-                                        key={i}
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            gap: 12,
-                                            paddingVertical: 10,
-                                            borderBottomWidth: i < matches.length - 2 ? 1 : 0,
-                                            borderBottomColor: '#F3F4F6',
-                                        }}
-                                    >
+                            <Text style={{ ...Typography.bodySmall, color: '#6B7280', textAlign: 'center', lineHeight: 20 }}>
+                                {parsed.noMatchMessage || 'The uploaded face could not be matched to any identity in the database.'}
+                            </Text>
+                            <View style={{
+                                backgroundColor: '#FEF3C7',
+                                paddingVertical: 6,
+                                paddingHorizontal: 16,
+                                borderRadius: 8,
+                            }}>
+                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#D97706' }}>
+                                    0 MATCHES
+                                </Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <>
+                            {/* Summary */}
+                            {hasResults && (
+                                <View style={{
+                                    backgroundColor: AppColors.white,
+                                    borderRadius: 16,
+                                    padding: 16,
+                                    borderWidth: 1,
+                                    borderColor: '#E5E7EB',
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-around',
+                                }}>
+                                    <View style={{ alignItems: 'center', gap: 4 }}>
+                                        <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
+                                            {parsed.identities.length}
+                                        </Text>
+                                        <Text style={{ ...Typography.caption, color: '#6B7280' }}>Faces Detected</Text>
+                                    </View>
+                                    <View style={{ width: 1, backgroundColor: '#E5E7EB' }} />
+                                    <View style={{ alignItems: 'center', gap: 4 }}>
+                                        <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.success }}>
+                                            {knownIdentities.length}
+                                        </Text>
+                                        <Text style={{ ...Typography.caption, color: '#6B7280' }}>Identified</Text>
+                                    </View>
+                                    <View style={{ width: 1, backgroundColor: '#E5E7EB' }} />
+                                    <View style={{ alignItems: 'center', gap: 4 }}>
+                                        <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#D97706' }}>
+                                            {unknownIdentities.length}
+                                        </Text>
+                                        <Text style={{ ...Typography.caption, color: '#6B7280' }}>Unknown</Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Known Identities */}
+                            {knownIdentities.length > 0 && (
+                                <View style={{
+                                    backgroundColor: AppColors.white,
+                                    borderRadius: 16,
+                                    padding: 20,
+                                    borderWidth: 1,
+                                    borderColor: '#E5E7EB',
+                                    gap: 14,
+                                }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                            Identified Persons
+                                        </Text>
                                         <View style={{
-                                            width: 40,
-                                            height: 40,
-                                            borderRadius: 20,
-                                            backgroundColor: '#F3F4F6',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
+                                            backgroundColor: '#DCFCE7',
+                                            paddingVertical: 4,
+                                            paddingHorizontal: 10,
+                                            borderRadius: 8,
                                         }}>
-                                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>
-                                                {m.identity.charAt(0)}
-                                            </Text>
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                                                {m.identity}
-                                            </Text>
-                                            <Text style={{ ...Typography.caption, color: '#9CA3AF' }}>
-                                                Distance: {m.distance.toFixed(4)}
-                                            </Text>
-                                        </View>
-                                        <View style={{
-                                            backgroundColor: m.verified ? '#DCFCE7' : '#FEF3C7',
-                                            paddingHorizontal: 8,
-                                            paddingVertical: 3,
-                                            borderRadius: 6,
-                                        }}>
-                                            <Text style={{
-                                                fontSize: 12,
-                                                fontFamily: 'IBMPlexSans_600SemiBold',
-                                                color: m.verified ? AppColors.success : '#D97706',
-                                            }}>
-                                                {sim.toFixed(1)}%
+                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.success }}>
+                                                {knownIdentities.length} {knownIdentities.length === 1 ? 'MATCH' : 'MATCHES'}
                                             </Text>
                                         </View>
                                     </View>
-                                );
-                            })}
-                        </View>
+
+                                    {knownIdentities.map((name: string, i: number) => (
+                                        <View
+                                            key={i}
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 14,
+                                                paddingVertical: 12,
+                                                borderTopWidth: i > 0 ? 1 : 0,
+                                                borderTopColor: '#F3F4F6',
+                                            }}
+                                        >
+                                            <View style={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: 24,
+                                                backgroundColor: '#EEF2FF',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}>
+                                                <Text style={{ fontSize: 18, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
+                                                    {name.charAt(0).toUpperCase()}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
+                                                    {name}
+                                                </Text>
+                                                <Text style={{ ...Typography.caption, color: '#6B7280', marginTop: 2 }}>
+                                                    Model: ArcFace • Backend: RetinaFace
+                                                </Text>
+                                            </View>
+                                            <View style={{
+                                                backgroundColor: '#DCFCE7',
+                                                paddingVertical: 4,
+                                                paddingHorizontal: 8,
+                                                borderRadius: 6,
+                                            }}>
+                                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.success }}>
+                                                    MATCH
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Unknown Identities */}
+                            {unknownIdentities.length > 0 && (
+                                <View style={{
+                                    backgroundColor: AppColors.white,
+                                    borderRadius: 16,
+                                    padding: 20,
+                                    borderWidth: 1,
+                                    borderColor: '#FDE68A',
+                                    gap: 14,
+                                }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                            Unidentified Persons
+                                        </Text>
+                                        <View style={{
+                                            backgroundColor: '#FEF3C7',
+                                            paddingVertical: 4,
+                                            paddingHorizontal: 10,
+                                            borderRadius: 8,
+                                        }}>
+                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#D97706' }}>
+                                                {unknownIdentities.length} UNKNOWN
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {unknownIdentities.map((name: string, i: number) => (
+                                        <View
+                                            key={i}
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 14,
+                                                paddingVertical: 12,
+                                                borderTopWidth: i > 0 ? 1 : 0,
+                                                borderTopColor: '#F3F4F6',
+                                            }}
+                                        >
+                                            <View style={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: 24,
+                                                backgroundColor: '#FEF3C7',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}>
+                                                <UserIcon />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                                    {name}
+                                                </Text>
+                                                <Text style={{ ...Typography.caption, color: '#9CA3AF', marginTop: 2 }}>
+                                                    Not found in database
+                                                </Text>
+                                            </View>
+                                            <View style={{
+                                                backgroundColor: '#FEF3C7',
+                                                paddingVertical: 4,
+                                                paddingHorizontal: 8,
+                                                borderRadius: 6,
+                                            }}>
+                                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: '#D97706' }}>
+                                                    NO MATCH
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Action Buttons */}
+                            <View style={{ gap: 10 }}>
+                                <Pressable
+                                    onPress={() => Alert.alert('Download Report', 'Report downloaded successfully.')}
+                                    style={({ pressed }) => ({
+                                        backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
+                                        borderRadius: 14,
+                                        paddingVertical: 14,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                    })}
+                                >
+                                    <DownloadIcon />
+                                    <Text style={{ ...Typography.button, color: AppColors.white }}>
+                                        Download Report
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={() => setCaseModalVisible(true)}
+                                    style={({ pressed }) => ({
+                                        backgroundColor: pressed ? '#F0F4FF' : AppColors.white,
+                                        borderRadius: 14,
+                                        paddingVertical: 14,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                        borderWidth: 1.5,
+                                        borderColor: AppColors.primary,
+                                    })}
+                                >
+                                    <FolderIcon />
+                                    <Text style={{ ...Typography.button, color: AppColors.primary }}>
+                                        Add to Case
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </>
                     )}
-
-                    {/* Action Buttons */}
-                    <View style={{ gap: 10 }}>
-                        <Pressable
-                            onPress={() => Alert.alert('Download Report', 'Report downloaded successfully.')}
-                            style={({ pressed }) => ({
-                                backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
-                                borderRadius: 14,
-                                paddingVertical: 14,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 8,
-                            })}
-                        >
-                            <DownloadIcon />
-                            <Text style={{ ...Typography.button, color: AppColors.white }}>
-                                Download Report
-                            </Text>
-                        </Pressable>
-
-                        <Pressable
-                            onPress={() => setCaseModalVisible(true)}
-                            style={({ pressed }) => ({
-                                backgroundColor: pressed ? '#F0F4FF' : AppColors.white,
-                                borderRadius: 14,
-                                paddingVertical: 14,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 8,
-                                borderWidth: 1.5,
-                                borderColor: AppColors.primary,
-                            })}
-                        >
-                            <FolderIcon />
-                            <Text style={{ ...Typography.button, color: AppColors.primary }}>
-                                Add to Case
-                            </Text>
-                        </Pressable>
-                    </View>
                 </View>
             </ScrollView>
 

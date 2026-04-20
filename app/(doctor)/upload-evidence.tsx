@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 import { BottomDrawer } from '@/components/bottom-drawer';
@@ -13,27 +13,33 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 function BackIcon() {
     return (
         <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path
-                d="M19 12H5M12 19l-7-7 7-7"
-                stroke={AppColors.textPrimary}
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
+            <Path d="M19 12H5M12 19l-7-7 7-7" stroke={AppColors.textPrimary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
 
 function UploadIcon() {
     return (
-        <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
-            <Path
-                d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
-                stroke={AppColors.primary}
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+            <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke={AppColors.primary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function CameraIcon() {
+    return (
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+            <Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2v11z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M12 17a4 4 0 100-8 4 4 0 000 8z" stroke={AppColors.primary} strokeWidth={1.5} />
+        </Svg>
+    );
+}
+
+function EvidenceIcon() {
+    return (
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+            <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M14 2v6h6" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
@@ -41,47 +47,24 @@ function UploadIcon() {
 function XIcon() {
     return (
         <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-            <Path
-                d="M18 6L6 18M6 6l12 12"
-                stroke="#EF4444"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-            />
-        </Svg>
-    );
-}
-
-function ChevronIcon() {
-    return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path
-                d="M6 9l6 6 6-6"
-                stroke={AppColors.border}
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
+            <Path d="M18 6L6 18M6 6l12 12" stroke="#EF4444" strokeWidth={2.5} strokeLinecap="round" />
         </Svg>
     );
 }
 
 function FileIcon() {
     return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path
-                d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
-                stroke={AppColors.primary}
-                strokeWidth={1.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <Path
-                d="M14 2v6h6"
-                stroke={AppColors.primary}
-                strokeWidth={1.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+            <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M14 2v6h6" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function ChevronIcon() {
+    return (
+        <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Path d="M6 9l6 6 6-6" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
@@ -145,6 +128,16 @@ export default function UploadEvidence() {
         setFiles((prev) => [...prev, newFile]);
     };
 
+    const addCapturedFile = () => {
+        const newFile: UploadedFile = {
+            id: Date.now().toString(),
+            name: `capture_${files.length + 1}.jpg`,
+            size: '3.8 MB',
+            type: 'image',
+        };
+        setFiles((prev) => [...prev, newFile]);
+    };
+
     const handleSubmit = () => {
         setSuccessDrawerVisible(true);
     };
@@ -159,88 +152,115 @@ export default function UploadEvidence() {
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Header */}
-                <View
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingHorizontal: Spacing.md,
-                        paddingVertical: 14,
-                        backgroundColor: AppColors.white,
-                        gap: 12,
-                    }}
-                >
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: Spacing.md,
+                    paddingVertical: 14,
+                    backgroundColor: AppColors.white,
+                    gap: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F3F4F6',
+                }}>
                     <Pressable onPress={handleBack} hitSlop={8}>
                         <BackIcon />
                     </Pressable>
-                    <Text style={{ ...Typography.h5, color: AppColors.textPrimary, flex: 1 }}>
-                        Upload Evidence
-                    </Text>
+                    <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={{ fontSize: 17, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
+                            Upload Evidence
+                        </Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
+                            Add files or capture new evidence
+                        </Text>
+                    </View>
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: AppColors.primary + '12', alignItems: 'center', justifyContent: 'center' }}>
+                        <EvidenceIcon />
+                    </View>
                 </View>
 
-                <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 20 }}>
-                    {/* File Upload Area — at the top */}
-                    <View style={{ gap: 8 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                            Upload Files
-                        </Text>
+                <View style={{ paddingHorizontal: Spacing.md, paddingTop: 20, gap: 16 }}>
+                    {/* Upload Methods - two cards side by side */}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
                         <Pressable
                             onPress={addMockFile}
                             style={({ pressed }) => ({
+                                flex: 1,
                                 backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
-                                borderRadius: 12,
-                                borderCurve: 'continuous' as const,
+                                borderRadius: 14,
                                 borderWidth: 1.5,
-                                borderColor: AppColors.primary,
+                                borderColor: AppColors.primary + '40',
                                 borderStyle: 'dashed',
                                 paddingVertical: 24,
                                 alignItems: 'center',
-                                gap: 8,
+                                gap: 10,
                             })}
                         >
-                            <UploadIcon />
-                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.primary }}>
-                                Tap to upload files
+                            <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: AppColors.primary + '0A', alignItems: 'center', justifyContent: 'center' }}>
+                                <UploadIcon />
+                            </View>
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                Upload
                             </Text>
-                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.border }}>
-                                Supports images, audio, video, documents
+                            <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', textAlign: 'center' }}>
+                                Photos, docs, audio
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            onPress={addCapturedFile}
+                            style={({ pressed }) => ({
+                                flex: 1,
+                                backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                borderColor: AppColors.primary + '40',
+                                borderStyle: 'dashed',
+                                paddingVertical: 24,
+                                alignItems: 'center',
+                                gap: 10,
+                            })}
+                        >
+                            <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: AppColors.primary + '0A', alignItems: 'center', justifyContent: 'center' }}>
+                                <CameraIcon />
+                            </View>
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                Capture
+                            </Text>
+                            <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', textAlign: 'center' }}>
+                                Take photo or video
                             </Text>
                         </Pressable>
                     </View>
 
                     {/* Uploaded Files */}
                     {files.length > 0 && (
-                        <View style={{ gap: 10 }}>
-                            <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                                Uploaded Files ({files.length})
-                            </Text>
+                        <View style={{ backgroundColor: AppColors.white, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 14, gap: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                    Files ({files.length})
+                                </Text>
+                            </View>
                             {files.map((file) => (
                                 <View
                                     key={file.id}
                                     style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        backgroundColor: AppColors.white,
-                                        borderRadius: 10,
-                                        borderWidth: 1,
-                                        borderColor: '#E5E7EB',
-                                        paddingHorizontal: 12,
-                                        paddingVertical: 10,
-                                        gap: 10,
+                                        flexDirection: 'row', alignItems: 'center',
+                                        backgroundColor: '#F9FAFB', borderRadius: 10,
+                                        paddingHorizontal: 12, paddingVertical: 10, gap: 10,
                                     }}
                                 >
-                                    <FileIcon />
+                                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: AppColors.primary + '0A', alignItems: 'center', justifyContent: 'center' }}>
+                                        <FileIcon />
+                                    </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text
-                                            style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}
-                                            numberOfLines={1}
-                                        >
+                                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }} numberOfLines={1}>
                                             {file.name}
                                         </Text>
-                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.border }}>
+                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
                                             {file.size}
                                         </Text>
                                     </View>
-                                    <Pressable onPress={() => removeFile(file.id)} hitSlop={8}>
+                                    <Pressable onPress={() => removeFile(file.id)} hitSlop={8} style={{ padding: 4 }}>
                                         <XIcon />
                                     </Pressable>
                                 </View>
@@ -248,140 +268,107 @@ export default function UploadEvidence() {
                         </View>
                     )}
 
-                    {/* Evidence Name */}
-                    <View style={{ gap: 8 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                            Evidence Name
+                    {/* Evidence Details Card */}
+                    <View style={{ backgroundColor: AppColors.white, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 16, gap: 16 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                            Evidence Details
                         </Text>
-                        <View
-                            style={{
-                                backgroundColor: AppColors.white,
-                                borderRadius: 10,
-                                borderWidth: 1,
-                                borderColor: '#E5E7EB',
-                                height: 50,
-                                paddingHorizontal: 14,
-                                justifyContent: 'center',
-                            }}
-                        >
-                            <RNTextInput
-                                placeholder="Enter evidence name"
-                                value={evidenceName}
-                                onChangeText={setEvidenceName}
-                                placeholderTextColor={AppColors.border}
+
+                        {/* Evidence Name */}
+                        <View style={{ gap: 6 }}>
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                                Evidence Name
+                            </Text>
+                            <View style={{ backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', height: 48, paddingHorizontal: 14, justifyContent: 'center' }}>
+                                <RNTextInput
+                                    placeholder="Enter evidence name"
+                                    value={evidenceName}
+                                    onChangeText={setEvidenceName}
+                                    placeholderTextColor="#D1D5DB"
+                                    style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}
+                                />
+                            </View>
+                        </View>
+
+                        {/* Select Case */}
+                        <View style={{ gap: 6, zIndex: 20 }}>
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                                Select Case
+                            </Text>
+                            <Pressable
+                                onPress={() => setCaseDropdownOpen(!caseDropdownOpen)}
                                 style={{
-                                    fontSize: 14,
-                                    fontFamily: 'IBMPlexSans_400Regular',
-                                    color: AppColors.textPrimary,
+                                    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                    backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1,
+                                    borderColor: caseDropdownOpen ? AppColors.primary : '#E5E7EB',
+                                    height: 48, paddingHorizontal: 14,
                                 }}
-                            />
+                            >
+                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: selectedCase ? AppColors.textPrimary : '#D1D5DB' }}>
+                                    {selectedCase || 'Choose a case'}
+                                </Text>
+                                <ChevronIcon />
+                            </Pressable>
+                            {caseDropdownOpen && (
+                                <View style={{
+                                    position: 'absolute', top: 76, left: 0, right: 0,
+                                    backgroundColor: AppColors.white, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB',
+                                    overflow: 'hidden', elevation: 4, zIndex: 30,
+                                }}>
+                                    {mockCases.map((c) => (
+                                        <Pressable
+                                            key={c}
+                                            onPress={() => { setSelectedCase(c); setCaseDropdownOpen(false); }}
+                                            style={({ pressed }) => ({
+                                                paddingVertical: 12, paddingHorizontal: 14,
+                                                backgroundColor: pressed ? '#F3F4F6' : selectedCase === c ? '#F0F4FF' : AppColors.white,
+                                            })}
+                                        >
+                                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}>{c}</Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Description */}
+                        <View style={{ gap: 6 }}>
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                                Description
+                            </Text>
+                            <View style={{ backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, minHeight: 90 }}>
+                                <RNTextInput
+                                    placeholder="Describe the evidence..."
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    multiline
+                                    textAlignVertical="top"
+                                    placeholderTextColor="#D1D5DB"
+                                    style={{ flex: 1, fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary, minHeight: 66 }}
+                                />
+                            </View>
                         </View>
                     </View>
 
-                    {/* Select Case dropdown */}
-                    <View style={{ gap: 8, zIndex: 20 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                            Select Case
-                        </Text>
-                        <Pressable
-                            onPress={() => {
-                                setCaseDropdownOpen(!caseDropdownOpen);
-                            }}
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                backgroundColor: AppColors.white,
-                                borderRadius: 10,
-                                borderWidth: 1,
-                                borderColor: caseDropdownOpen ? AppColors.primary : '#E5E7EB',
-                                height: 50,
-                                paddingHorizontal: 14,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    fontFamily: 'IBMPlexSans_400Regular',
-                                    color: selectedCase ? AppColors.textPrimary : AppColors.border,
-                                }}
-                            >
-                                {selectedCase || 'Choose a case'}
-                            </Text>
-                            <ChevronIcon />
-                        </Pressable>
-                        {caseDropdownOpen && (
-                            <View
-                                style={{
-                                    position: 'absolute',
-                                    top: 82,
-                                    left: 0,
-                                    right: 0,
-                                    backgroundColor: AppColors.white,
-                                    borderRadius: 10,
-                                    borderWidth: 1,
-                                    borderColor: '#E5E7EB',
-                                    overflow: 'hidden',
-                                    elevation: 4,
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                }}
-                            >
-                                {mockCases.map((c) => (
-                                    <Pressable
-                                        key={c}
-                                        onPress={() => {
-                                            setSelectedCase(c);
-                                            setCaseDropdownOpen(false);
-                                        }}
-                                        style={({ pressed }) => ({
-                                            paddingVertical: 12,
-                                            paddingHorizontal: 14,
-                                            backgroundColor: pressed ? '#F3F4F6' : selectedCase === c ? '#EEF2FF' : AppColors.white,
-                                        })}
-                                    >
-                                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}>
-                                            {c}
-                                        </Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Analysis Model — BottomDrawer selector */}
-                    <View style={{ gap: 8 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                    {/* Analysis Model Card */}
+                    <View style={{ backgroundColor: AppColors.white, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 16, gap: 12 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 0.5, textTransform: 'uppercase' }}>
                             Analysis Model
                         </Text>
                         <Pressable
                             onPress={() => setModelDrawerOpen(true)}
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                backgroundColor: AppColors.white,
-                                borderRadius: 10,
-                                borderWidth: 1,
+                            style={({ pressed }) => ({
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                backgroundColor: pressed ? '#F3F4F6' : '#F9FAFB', borderRadius: 10, borderWidth: 1,
                                 borderColor: selectedModelKey ? AppColors.primary : '#E5E7EB',
-                                height: 50,
-                                paddingHorizontal: 14,
-                            }}
+                                height: 48, paddingHorizontal: 14,
+                            })}
                         >
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    fontFamily: selectedModelKey ? 'IBMPlexSans_500Medium' : 'IBMPlexSans_400Regular',
-                                    color: selectedModelKey ? AppColors.primary : AppColors.border,
-                                    flex: 1,
-                                }}
-                            >
+                            <Text style={{ fontSize: 14, fontFamily: selectedModelKey ? 'IBMPlexSans_500Medium' : 'IBMPlexSans_400Regular', color: selectedModelKey ? AppColors.primary : '#D1D5DB', flex: 1 }}>
                                 {selectedModelKey ? MODEL_NAME_MAP[selectedModelKey] : 'None — Skip analysis'}
                             </Text>
                             {selectedModelKey ? (
-                                <Pressable
-                                    onPress={() => setSelectedModelKey('')}
-                                    hitSlop={8}
-                                >
+                                <Pressable onPress={() => setSelectedModelKey('')} hitSlop={8}>
                                     <XIcon />
                                 </Pressable>
                             ) : (
@@ -390,49 +377,14 @@ export default function UploadEvidence() {
                         </Pressable>
                     </View>
 
-                    {/* Description */}
-                    <View style={{ gap: 8 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                            Description
-                        </Text>
-                        <View
-                            style={{
-                                backgroundColor: AppColors.white,
-                                borderRadius: 10,
-                                borderWidth: 1,
-                                borderColor: '#E5E7EB',
-                                paddingHorizontal: 14,
-                                paddingVertical: 12,
-                                minHeight: 100,
-                            }}
-                        >
-                            <RNTextInput
-                                placeholder="Describe the evidence..."
-                                value={description}
-                                onChangeText={setDescription}
-                                multiline
-                                textAlignVertical="top"
-                                style={{
-                                    flex: 1,
-                                    fontSize: 14,
-                                    fontFamily: 'IBMPlexSans_400Regular',
-                                    color: AppColors.textPrimary,
-                                    minHeight: 76,
-                                }}
-                                placeholderTextColor={AppColors.border}
-                            />
-                        </View>
-                    </View>
-
                     {/* Action Buttons */}
-                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
                         <Pressable
                             onPress={handleBack}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
-                                borderRadius: 12,
-                                borderCurve: 'continuous' as const,
+                                borderRadius: 14,
                                 borderWidth: 1.5,
                                 borderColor: '#D1D5DB',
                                 height: 52,
@@ -440,15 +392,14 @@ export default function UploadEvidence() {
                                 justifyContent: 'center',
                             })}
                         >
-                            <Text style={{ ...Typography.button, color: AppColors.textPrimary }}>Cancel</Text>
+                            <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Cancel</Text>
                         </Pressable>
                         <Pressable
                             onPress={handleSubmit}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
-                                borderRadius: 12,
-                                borderCurve: 'continuous' as const,
+                                borderRadius: 14,
                                 height: 52,
                                 flexDirection: 'row',
                                 alignItems: 'center',
@@ -459,7 +410,7 @@ export default function UploadEvidence() {
                             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                                 <Path d="M12 5v14M5 12h14" stroke={AppColors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
-                            <Text style={{ ...Typography.button, color: AppColors.white, fontSize: 14 }}>
+                            <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
                                 {selectedModelKey ? 'Analyze' : 'Upload'}
                             </Text>
                         </Pressable>
@@ -472,100 +423,78 @@ export default function UploadEvidence() {
                 visible={modelDrawerOpen}
                 onClose={() => setModelDrawerOpen(false)}
                 title="Select Analysis Model"
-                subtitle="Analysis will run automatically after upload"
+                subtitle="Pick a model to run after upload"
             >
-                {/* None option */}
-                <Pressable
-                    onPress={() => {
-                        setSelectedModelKey('');
-                        setModelDrawerOpen(false);
-                    }}
-                    style={({ pressed }) => ({
-                        backgroundColor: pressed ? '#F8FAFC' : !selectedModelKey ? '#F0F4FF' : AppColors.white,
-                        borderRadius: 12,
-                        borderWidth: 1.5,
-                        borderColor: !selectedModelKey ? AppColors.primary : '#E5E7EB',
-                        padding: 14,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 12,
-                    })}
-                >
-                    <View style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 12,
-                        backgroundColor: '#F3F4F6',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}>
-                        <SkipIcon size={20} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                            None — Skip Analysis
-                        </Text>
-                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                            Just upload evidence without running a model
-                        </Text>
-                    </View>
-                    {!selectedModelKey && (
-                        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                            <Path d="M20 6L9 17l-5-5" stroke={AppColors.primary} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-                        </Svg>
-                    )}
-                </Pressable>
-
-                {/* Model options */}
-                {MODEL_OPTIONS.map((model) => {
-                    const Icon = model.icon;
-                    const isSelected = selectedModelKey === model.key;
-                    return (
-                        <Pressable
-                            key={model.key}
-                            onPress={() => {
-                                setSelectedModelKey(model.key);
-                                setModelDrawerOpen(false);
-                            }}
-                            style={({ pressed }) => ({
-                                backgroundColor: pressed ? '#F8FAFC' : isSelected ? '#F0F4FF' : AppColors.white,
-                                borderRadius: 12,
-                                borderWidth: 1.5,
-                                borderColor: isSelected ? AppColors.primary : '#E5E7EB',
-                                padding: 14,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 12,
-                            })}
-                        >
-                            <View style={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: 12,
-                                backgroundColor: AppColors.primary + '10',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}>
-                                <Icon size={20} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                    {model.title}
-                                </Text>
-                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                    {model.description}
-                                </Text>
-                            </View>
-                            {isSelected ? (
-                                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                                    <Path d="M20 6L9 17l-5-5" stroke={AppColors.primary} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                <View style={{ gap: 6 }}>
+                    {/* None option */}
+                    <Pressable
+                        onPress={() => { setSelectedModelKey(''); setModelDrawerOpen(false); }}
+                        style={({ pressed }) => ({
+                            backgroundColor: pressed ? '#F3F4F6' : !selectedModelKey ? AppColors.primary + '06' : AppColors.white,
+                            borderRadius: 12,
+                            borderWidth: !selectedModelKey ? 1.5 : 1,
+                            borderColor: !selectedModelKey ? AppColors.primary : '#F3F4F6',
+                            paddingHorizontal: 14,
+                            paddingVertical: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 12,
+                        })}
+                    >
+                        <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}>
+                            <SkipIcon size={18} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>Skip Analysis</Text>
+                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>Just upload the evidence</Text>
+                        </View>
+                        {!selectedModelKey && (
+                            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: AppColors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                                <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+                                    <Path d="M20 6L9 17l-5-5" stroke={AppColors.white} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
                                 </Svg>
-                            ) : (
-                                <ChevronRightModelIcon size={16} />
-                            )}
-                        </Pressable>
-                    );
-                })}
+                            </View>
+                        )}
+                    </Pressable>
+
+                    {/* Model options */}
+                    {MODEL_OPTIONS.map((model) => {
+                        const Icon = model.icon;
+                        const isSelected = selectedModelKey === model.key;
+                        return (
+                            <Pressable
+                                key={model.key}
+                                onPress={() => { setSelectedModelKey(model.key); setModelDrawerOpen(false); }}
+                                style={({ pressed }) => ({
+                                    backgroundColor: pressed ? '#F3F4F6' : isSelected ? AppColors.primary + '06' : AppColors.white,
+                                    borderRadius: 12,
+                                    borderWidth: isSelected ? 1.5 : 1,
+                                    borderColor: isSelected ? AppColors.primary : '#F3F4F6',
+                                    paddingHorizontal: 14,
+                                    paddingVertical: 12,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                })}
+                            >
+                                <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: AppColors.primary + '08', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Icon size={18} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>{model.title}</Text>
+                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>{model.description}</Text>
+                                </View>
+                                {isSelected && (
+                                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: AppColors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+                                            <Path d="M20 6L9 17l-5-5" stroke={AppColors.white} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+                                        </Svg>
+                                    </View>
+                                )}
+                            </Pressable>
+                        );
+                    })}
+                </View>
             </BottomDrawer>
 
             <DiscardChangesModal visible={showDiscard} onCancel={() => setShowDiscard(false)} onDiscard={() => { setShowDiscard(false); router.back(); }} />
@@ -573,51 +502,27 @@ export default function UploadEvidence() {
             {/* Success Drawer */}
             <BottomDrawer
                 visible={successDrawerVisible}
-                onClose={() => {
-                    setSuccessDrawerVisible(false);
-                    router.back();
-                }}
+                onClose={() => { setSuccessDrawerVisible(false); router.back(); }}
                 title=""
-                height={SCREEN_HEIGHT * 0.42}
+                height={SCREEN_HEIGHT * 0.35}
             >
-                <View style={{ alignItems: 'center', gap: 16, paddingTop: 8, paddingBottom: 16 }}>
-                    <View style={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 32,
-                        backgroundColor: '#DCFCE7',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}>
-                        <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
+                <View style={{ alignItems: 'center', gap: 14, paddingTop: 8, paddingBottom: 8 }}>
+                    <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
+                        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
                             <Path d="M20 6L9 17l-5-5" stroke={AppColors.success} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
                         </Svg>
                     </View>
-                    <Text style={{ ...Typography.h5, color: AppColors.textPrimary, textAlign: 'center' }}>
+                    <Text style={{ fontSize: 17, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary, textAlign: 'center' }}>
                         Evidence Uploaded
                     </Text>
-                    <Text style={{ ...Typography.bodySmall, color: '#6B7280', textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280', textAlign: 'center', lineHeight: 19, paddingHorizontal: 20 }}>
                         {selectedModelKey
-                            ? 'Your evidence has been added to the case. Analysis is running in the background — you\'ll be notified when results are ready.'
-                            : 'Your evidence has been successfully added to the case.'}
+                            ? 'Analysis is running in the background — you\'ll be notified when results are ready.'
+                            : 'Your evidence has been added to the case successfully.'}
                     </Text>
-                    <Pressable
-                        onPress={() => {
-                            setSuccessDrawerVisible(false);
-                            router.back();
-                        }}
-                        style={({ pressed }) => ({
-                            width: '100%',
-                            backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
-                            borderRadius: 12,
-                            height: 48,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginTop: 4,
-                        })}
-                    >
-                        <Text style={{ ...Typography.button, color: AppColors.white }}>Done</Text>
-                    </Pressable>
+                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', marginTop: 4 }}>
+                        Tap outside to dismiss
+                    </Text>
                 </View>
             </BottomDrawer>
         </View>

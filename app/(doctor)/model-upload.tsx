@@ -143,6 +143,10 @@ export default function ModelUploadScreen() {
                     type: 'image/jpeg',
                     name: 'upload.jpg',
                 } as any);
+                if (model === 'face') {
+                    formData.append('model_name', 'ArcFace');
+                }
+                formData.append('detector_backend', 'retinaface');
 
                 const endpoint = model === 'deepfake' ? '/liveness' : '/recognize';
 
@@ -161,7 +165,24 @@ export default function ModelUploadScreen() {
 
                 if (!response.ok) {
                     const errorText = await response.text().catch(() => '');
-                    throw new Error(`Server returned ${response.status}: ${errorText}`);
+                    let errorMessage = `Server returned ${response.status}`;
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.error || errorJson.message || errorMessage;
+                    } catch {
+                        if (errorText) errorMessage = errorText;
+                    }
+                    setLoading(false);
+
+                    // Navigate to result page with error instead of Alert
+                    const resultPath = model === 'deepfake'
+                        ? '/(doctor)/results-deepfake'
+                        : '/(doctor)/results-face-recognition';
+                    router.push({
+                        pathname: resultPath as any,
+                        params: { imageUri, errorData: errorMessage },
+                    });
+                    return;
                 }
 
                 const data = await response.json();

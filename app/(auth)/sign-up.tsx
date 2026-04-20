@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Image, StatusBar, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Button } from '@/components/ui/button';
 import { TextInput } from '@/components/ui/text-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SocialLoginRow } from '@/components/ui/social-login-row';
-import { AppColors, Typography, Spacing } from '@/constants/theme';
+import { AppColors } from '@/constants/theme';
 
 function validateEmail(email: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -44,7 +46,7 @@ export default function SignUpScreen() {
     const [agreeTerms, setAgreeTerms] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const navyHeight = height * 0.22;
+    const headerHeight = height * 0.22;
 
     const validate = () => {
         const e: Record<string, string> = {};
@@ -69,7 +71,6 @@ export default function SignUpScreen() {
 
     const handleSignUp = () => {
         if (!validate()) return;
-        // TODO: implement actual registration
         router.replace('/(auth)/login');
     };
 
@@ -97,37 +98,50 @@ export default function SignUpScreen() {
                 hitSlop={16}
                 style={{
                     position: 'absolute',
-                    top: 54,
+                    top: 52,
                     left: 20,
                     zIndex: 10,
                     width: 40,
                     height: 40,
-                    borderRadius: 20,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.3)',
+                    borderRadius: 12,
+                    backgroundColor: 'rgba(255,255,255,0.12)',
                     alignItems: 'center',
                     justifyContent: 'center',
                 }}
             >
                 <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Path
-                        d="M19 12H5M12 19l-7-7 7-7"
-                        stroke={AppColors.white}
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
+                    <Path d="M19 12H5M12 19l-7-7 7-7" stroke={AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </Svg>
             </Pressable>
 
-            {/* Logo in navy area */}
-            <View style={{ height: navyHeight, alignItems: 'center', justifyContent: 'center', paddingTop: 40 }}>
-                <Image
-                    source={require('@/assets/images/forensic-logo.png')}
-                    style={{ width: 100, height: 100, borderRadius: 50 }}
-                    resizeMode="contain"
-                />
-            </View>
+            {/* Gradient header with logo */}
+            <LinearGradient
+                colors={['#141E3E', AppColors.primary, '#243270']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ height: headerHeight, alignItems: 'center', justifyContent: 'center', paddingTop: 36 }}
+            >
+                {/* Decorative circles */}
+                <View style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.03)' }} />
+                <View style={{ position: 'absolute', bottom: 10, left: -30, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.02)' }} />
+
+                <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center' }}>
+                    <View style={{
+                        width: 86,
+                        height: 86,
+                        borderRadius: 22,
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}>
+                        <Image
+                            source={require('@/assets/images/forensic-logo.png')}
+                            style={{ width: 72, height: 72, borderRadius: 18 }}
+                            resizeMode="contain"
+                        />
+                    </View>
+                </Animated.View>
+            </LinearGradient>
 
             {/* White card */}
             <ScrollView
@@ -135,19 +149,32 @@ export default function SignUpScreen() {
                 style={{
                     flex: 1,
                     backgroundColor: AppColors.white,
-                    borderTopLeftRadius: 32,
-                    borderTopRightRadius: 32,
+                    borderTopLeftRadius: 28,
+                    borderTopRightRadius: 28,
+                    marginTop: -16,
                 }}
                 keyboardShouldPersistTaps="handled"
             >
-                <View style={{ padding: Spacing.lg, paddingTop: 28, gap: 20 }}>
-                    <Text style={{ ...Typography.h3, color: AppColors.textPrimary, textAlign: 'center' }}>
-                        Sign up
-                    </Text>
+                <View style={{ paddingHorizontal: 24, paddingTop: 28, gap: 22 }}>
+                    {/* Title */}
+                    <Animated.View entering={FadeInUp.delay(100).duration(400)} style={{ gap: 6 }}>
+                        <Text style={{ fontSize: 26, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
+                            Create Account
+                        </Text>
+                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', lineHeight: 20 }}>
+                            Fill in your details to get started
+                        </Text>
+                    </Animated.View>
 
-                    <View style={{ gap: 16 }}>
-                        {/* First name / Last name */}
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {/* Form */}
+                    <Animated.View entering={FadeInUp.delay(200).duration(400)} style={{ gap: 14 }}>
+                        {/* Personal Info section label */}
+                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                            Personal Information
+                        </Text>
+
+                        {/* Name row */}
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
                             <View style={{ flex: 1 }}>
                                 <TextInput
                                     placeholder="First name"
@@ -169,7 +196,7 @@ export default function SignUpScreen() {
                         </View>
 
                         <TextInput
-                            placeholder="Email"
+                            placeholder="Email Address"
                             value={email}
                             onChangeText={setEmail}
                             icon="email"
@@ -178,7 +205,7 @@ export default function SignUpScreen() {
                         />
 
                         <TextInput
-                            placeholder="National ID"
+                            placeholder="National ID (14 digits)"
                             value={nationalId}
                             onChangeText={handleNationalIdChange}
                             icon="hash"
@@ -186,30 +213,28 @@ export default function SignUpScreen() {
                             error={errors.nationalId}
                         />
 
-                        {/* Phone number with country code */}
+                        {/* Phone row */}
                         <View style={{ gap: 4 }}>
                             <View style={{ flexDirection: 'row', gap: 8 }}>
-                                <Pressable
-                                    style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        height: 50,
-                                        borderRadius: 10,
-                                        borderWidth: 1,
-                                        borderColor: AppColors.border,
-                                        backgroundColor: AppColors.white,
-                                        paddingHorizontal: 10,
-                                        gap: 4,
-                                    }}
-                                >
-                                    <Text style={{ fontSize: 18 }}>🇪🇬</Text>
+                                <View style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    height: 50,
+                                    borderRadius: 10,
+                                    borderWidth: 1,
+                                    borderColor: '#E5E7EB',
+                                    backgroundColor: '#F9FAFB',
+                                    paddingHorizontal: 12,
+                                    gap: 4,
+                                }}>
+                                    <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>+20</Text>
                                     <Svg width={10} height={6} viewBox="0 0 10 6" fill="none">
-                                        <Path d="M1 1l4 4 4-4" stroke={AppColors.border} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                                        <Path d="M1 1l4 4 4-4" stroke="#9CA3AF" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                                     </Svg>
-                                </Pressable>
+                                </View>
                                 <View style={{ flex: 1 }}>
                                     <TextInput
-                                        placeholder="+20"
+                                        placeholder="Phone number"
                                         value={phone}
                                         onChangeText={handlePhoneChange}
                                         icon="phone"
@@ -218,7 +243,7 @@ export default function SignUpScreen() {
                                 </View>
                             </View>
                             {errors.phone && (
-                                <Text style={{ ...Typography.caption, color: AppColors.error, marginLeft: 4 }}>
+                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.error, marginLeft: 4 }}>
                                     {errors.phone}
                                 </Text>
                             )}
@@ -232,6 +257,14 @@ export default function SignUpScreen() {
                             keyboardType="numeric"
                             error={errors.dob}
                         />
+
+                        {/* Divider */}
+                        <View style={{ height: 1, backgroundColor: '#F3F4F6', marginVertical: 4 }} />
+
+                        {/* Security section label */}
+                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                            Security
+                        </Text>
 
                         <TextInput
                             placeholder="Password"
@@ -255,32 +288,32 @@ export default function SignUpScreen() {
                             <Checkbox
                                 checked={agreeTerms}
                                 onToggle={() => setAgreeTerms(!agreeTerms)}
-                                label="I have read and agree with the Terms and condition"
+                                label="I agree to the Terms and Conditions"
                             />
                             {errors.terms && (
-                                <Text style={{ ...Typography.caption, color: AppColors.error, marginLeft: 4 }}>
+                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.error, marginLeft: 4 }}>
                                     {errors.terms}
                                 </Text>
                             )}
                         </View>
 
-                        <Button title="Sign up" onPress={handleSignUp} />
-                    </View>
+                        <View style={{ marginTop: 4 }}>
+                            <Button title="Create Account" onPress={handleSignUp} />
+                        </View>
+                    </Animated.View>
 
-                    <View style={{ marginTop: 4 }}>
-                        <SocialLoginRow
-                            onFacebook={() => { }}
-                            onGoogle={() => { }}
-                            onApple={() => { }}
-                        />
-                    </View>
+                    {/* Social */}
+                    <Animated.View entering={FadeInUp.delay(300).duration(400)}>
+                        <SocialLoginRow onFacebook={() => { }} onGoogle={() => { }} onApple={() => { }} />
+                    </Animated.View>
 
-                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4, paddingTop: 16 }}>
-                        <Text style={{ ...Typography.bodySmall, color: AppColors.textPrimary }}>
-                            Do You have an Account?
+                    {/* Login link */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4, paddingTop: 8 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
+                            Already have an account?
                         </Text>
                         <Pressable onPress={() => router.push('/(auth)/login')} hitSlop={8}>
-                            <Text style={{ ...Typography.bodySmall, color: AppColors.primary, fontFamily: 'IBMPlexSans_600SemiBold' }}>
+                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
                                 Login
                             </Text>
                         </Pressable>

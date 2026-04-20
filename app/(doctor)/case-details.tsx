@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { EditCaseDrawer } from '@/components/edit-case-drawer';
 import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, ChevronRightIcon as ChevronRightModelIcon } from '@/components/model-icons';
@@ -40,14 +41,6 @@ function EditIcon() {
     );
 }
 
-function ChevronIcon() {
-    return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M9 18l6-6-6-6" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
 function TrashIcon() {
     return (
         <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -62,6 +55,58 @@ function TeamIcon() {
             <Path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="#9CA3AF" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
+}
+
+function PlusIcon() {
+    return (
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M12 5v14M5 12h14" stroke={AppColors.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function AnalyzeIcon() {
+    return (
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" stroke={AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function ActiveDotIcon() {
+    return (
+        <Svg width={8} height={8} viewBox="0 0 8 8">
+            <Circle cx={4} cy={4} r={4} fill={AppColors.success} />
+        </Svg>
+    );
+}
+
+/* ─── AI Context Insights (mock) ─── */
+function getAIInsights(caseId: string, analyses: AnalysisEvidence[]) {
+    const hasDeepfake = analyses.some(a => a.modelType === 'deepfake');
+    const hasFace = analyses.some(a => a.modelType === 'face');
+    const hasFake = analyses.some(a => a.modelType === 'deepfake' && a.verdict.toLowerCase().includes('fake'));
+    const hasMatch = analyses.some(a => a.modelType === 'face' && a.verdict.toLowerCase().includes('match found'));
+
+    const insights: { text: string; type: 'info' | 'warning' | 'suggestion' }[] = [];
+
+    if (hasFake) {
+        insights.push({ text: 'Deepfake detected in evidence. Consider cross-referencing with original source material.', type: 'warning' });
+    }
+    if (hasMatch) {
+        insights.push({ text: 'Face match confirmed. Identity verification can be used to strengthen the case profile.', type: 'info' });
+    }
+    if (hasDeepfake && hasFace) {
+        insights.push({ text: 'Both deepfake and face analyses run. Consider running DNA phenotype for a comprehensive profile.', type: 'suggestion' });
+    }
+    if (analyses.length === 0) {
+        insights.push({ text: 'No analyses yet. Start with a deepfake check or face recognition to build the evidence chain.', type: 'suggestion' });
+    }
+    if (analyses.length === 1) {
+        insights.push({ text: 'Only one analysis completed. Running additional models improves case confidence.', type: 'suggestion' });
+    }
+
+    return insights.slice(0, 2);
 }
 
 const MODEL_ICON_MAP: Record<string, React.FC<{ size?: number }>> = {
@@ -297,6 +342,8 @@ export default function CaseDetails() {
         }
     }
 
+    const aiInsights = getAIInsights(caseId, evidence.analyses);
+
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
             <ScrollView
@@ -324,6 +371,24 @@ export default function CaseDetails() {
                     <Text style={{ ...Typography.h5, color: AppColors.textPrimary, flex: 1 }}>
                         Case Details
                     </Text>
+                    {!isCompleted && (
+                        <Pressable
+                            onPress={() => setEditDrawerVisible(true)}
+                            hitSlop={8}
+                            style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 10,
+                                backgroundColor: AppColors.primary + '10',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                                <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                            </Svg>
+                        </Pressable>
+                    )}
                 </View>
 
                 <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 16 }}>
@@ -335,7 +400,7 @@ export default function CaseDetails() {
                         padding: 18,
                         borderWidth: 1,
                         borderColor: '#E5E7EB',
-                        gap: 12,
+                        gap: 14,
                     }}>
                         {/* ID + Status row */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -346,23 +411,25 @@ export default function CaseDetails() {
                                 </Text>
                             </View>
                             <View style={{
-                                backgroundColor: isCompleted ? AppColors.success + '15' : AppColors.success + '15',
-                                borderRadius: 12,
+                                backgroundColor: isCompleted ? AppColors.success + '12' : AppColors.success + '12',
+                                borderRadius: 10,
                                 paddingHorizontal: 10,
                                 paddingVertical: 4,
                                 flexDirection: 'row',
                                 alignItems: 'center',
-                                gap: 4,
+                                gap: 5,
                             }}>
-                                {isCompleted && (
+                                {isCompleted ? (
                                     <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
                                         <Path d="M20 6L9 17l-5-5" stroke={AppColors.success} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
                                     </Svg>
+                                ) : (
+                                    <ActiveDotIcon />
                                 )}
                                 <Text style={{
                                     fontSize: 11,
                                     fontFamily: 'IBMPlexSans_600SemiBold',
-                                    color: isCompleted ? AppColors.success : AppColors.success,
+                                    color: AppColors.success,
                                 }}>
                                     {caseStatus}
                                 </Text>
@@ -370,7 +437,7 @@ export default function CaseDetails() {
                         </View>
 
                         {/* Title */}
-                        <Text style={{ ...Typography.h5, color: AppColors.textPrimary }}>
+                        <Text style={{ fontSize: 18, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
                             {caseTitle}
                         </Text>
 
@@ -381,13 +448,13 @@ export default function CaseDetails() {
 
                         {/* Date + Team */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 <CalendarIcon />
                                 <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
                                     {params.date || 'N/A'}
                                 </Text>
                             </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 <TeamIcon />
                                 <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }} numberOfLines={1}>
                                     {meta.team}
@@ -396,28 +463,81 @@ export default function CaseDetails() {
                         </View>
                     </View>
 
+                    {/* AI Context Insights */}
+                    {aiInsights.length > 0 && (
+                        <View style={{
+                            backgroundColor: AppColors.white,
+                            borderRadius: 14,
+                            borderWidth: 1,
+                            borderColor: '#E5E7EB',
+                            padding: 16,
+                            gap: 12,
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 8,
+                                    backgroundColor: '#6366F1' + '12',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}>
+                                    <Ionicons name="sparkles" size={14} color="#6366F1" />
+                                </View>
+                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                    AI Insights
+                                </Text>
+                            </View>
+                            {aiInsights.map((insight, idx) => {
+                                const bgColor = insight.type === 'warning' ? '#FEF3C7' : insight.type === 'info' ? '#DBEAFE' : '#F0FDF4';
+                                const textColor = insight.type === 'warning' ? '#92400E' : insight.type === 'info' ? '#1E40AF' : '#166534';
+                                const iconName = insight.type === 'warning' ? 'alert-circle-outline' : insight.type === 'info' ? 'information-circle-outline' : 'bulb-outline';
+                                return (
+                                    <View
+                                        key={idx}
+                                        style={{
+                                            flexDirection: 'row',
+                                            backgroundColor: bgColor,
+                                            borderRadius: 10,
+                                            padding: 12,
+                                            gap: 10,
+                                            alignItems: 'flex-start',
+                                        }}
+                                    >
+                                        <Ionicons name={iconName as any} size={16} color={textColor} style={{ marginTop: 1 }} />
+                                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_500Medium', color: textColor, flex: 1, lineHeight: 18 }}>
+                                            {insight.text}
+                                        </Text>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    )}
+
                     {/* Evidence Collected Section */}
                     <View style={{ gap: 12 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={{ ...Typography.h5, color: AppColors.textPrimary }}>
-                                Evidence Collected
-                            </Text>
-                            <View style={{
-                                backgroundColor: AppColors.primary + '15',
-                                borderRadius: 10,
-                                paddingHorizontal: 8,
-                                paddingVertical: 2,
-                            }}>
-                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
-                                    {totalEvidence}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={{ fontSize: 16, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                    Evidence
                                 </Text>
+                                <View style={{
+                                    backgroundColor: AppColors.primary + '12',
+                                    borderRadius: 10,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 2,
+                                }}>
+                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
+                                        {totalEvidence}
+                                    </Text>
+                                </View>
                             </View>
                         </View>
 
                         {/* Model Analyses */}
                         {evidence.analyses.length > 0 && (
                             <View style={{ gap: 8 }}>
-                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                     Model Analyses
                                 </Text>
                                 {evidence.analyses.map((a) => {
@@ -438,16 +558,16 @@ export default function CaseDetails() {
                                             })}
                                         >
                                             <View style={{
-                                                width: 36,
-                                                height: 36,
+                                                width: 38,
+                                                height: 38,
                                                 borderRadius: 10,
-                                                backgroundColor: AppColors.primary + '10',
+                                                backgroundColor: AppColors.primary + '0A',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                             }}>
                                                 <Icon size={18} />
                                             </View>
-                                            <View style={{ flex: 1, gap: 2 }}>
+                                            <View style={{ flex: 1, gap: 3 }}>
                                                 <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
                                                     {a.modelName}
                                                 </Text>
@@ -455,7 +575,7 @@ export default function CaseDetails() {
                                                     <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_500Medium', color: a.verdictColor }}>
                                                         {a.verdict}
                                                     </Text>
-                                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
+                                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>
                                                         {a.date}
                                                     </Text>
                                                 </View>
@@ -470,7 +590,7 @@ export default function CaseDetails() {
                         {/* User Evidence */}
                         {userEvidence.length > 0 && (
                             <View style={{ gap: 8 }}>
-                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                     Uploaded Evidence
                                 </Text>
                                 {userEvidence.map((e) => (
@@ -488,8 +608,8 @@ export default function CaseDetails() {
                                         }}
                                     >
                                         <View style={{
-                                            width: 36,
-                                            height: 36,
+                                            width: 38,
+                                            height: 38,
                                             borderRadius: 10,
                                             backgroundColor: '#F3F4F6',
                                             alignItems: 'center',
@@ -505,10 +625,7 @@ export default function CaseDetails() {
                                                 {e.name}
                                             </Text>
                                             <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }} numberOfLines={1}>
-                                                {e.type} • {e.date}
-                                            </Text>
-                                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280', marginTop: 2 }} numberOfLines={2}>
-                                                {e.description}
+                                                {e.type} · {e.date}
                                             </Text>
                                         </View>
                                         <Pressable
@@ -536,30 +653,33 @@ export default function CaseDetails() {
                                 borderRadius: 12,
                                 borderWidth: 1,
                                 borderColor: '#E5E7EB',
-                                padding: 24,
+                                padding: 28,
                                 alignItems: 'center',
                                 gap: 8,
                             }}>
-                                <Text style={{ ...Typography.bodySmall, color: '#9CA3AF' }}>
+                                <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
+                                    <Path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="#D1D5DB" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" />
+                                </Svg>
+                                <Text style={{ ...Typography.bodySmall, color: '#9CA3AF', marginTop: 4 }}>
                                     No evidence collected yet
                                 </Text>
                                 <Text style={{ ...Typography.caption, color: '#D1D5DB', textAlign: 'center' }}>
-                                    Run an analysis or upload evidence to add it to this case
+                                    Run an analysis or upload evidence to get started
                                 </Text>
                             </View>
                         )}
                     </View>
 
                     {/* Action buttons */}
-                    <View style={{ gap: 10, marginTop: 8 }}>
-                        {/* Row 1: Add Evidence + Edit Case */}
+                    <View style={{ gap: 10, marginTop: 4 }}>
+                        {/* Row 1: Add Evidence + Analyze Case */}
                         <View style={{ flexDirection: 'row', gap: 10 }}>
                             <Pressable
                                 onPress={() => router.push({ pathname: '/(doctor)/upload-evidence' as any, params: { caseId } })}
                                 style={({ pressed }) => ({
                                     flex: 1,
                                     flexDirection: 'row',
-                                    backgroundColor: pressed ? '#F0F4FF' : AppColors.white,
+                                    backgroundColor: pressed ? AppColors.primary + '08' : AppColors.white,
                                     borderRadius: 12,
                                     height: 48,
                                     alignItems: 'center',
@@ -569,13 +689,13 @@ export default function CaseDetails() {
                                     borderColor: AppColors.primary,
                                 })}
                             >
-                                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                                    <Path d="M12 5v14M5 12h14" stroke={AppColors.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                </Svg>
-                                <Text style={{ ...Typography.button, color: AppColors.primary }}>Add Evidence</Text>
+                                <PlusIcon />
+                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
+                                    Add Evidence
+                                </Text>
                             </Pressable>
                             <Pressable
-                                onPress={() => setEditDrawerVisible(true)}
+                                onPress={() => router.push({ pathname: '/(doctor)/analysis-models' as any })}
                                 style={({ pressed }) => ({
                                     flex: 1,
                                     flexDirection: 'row',
@@ -587,11 +707,13 @@ export default function CaseDetails() {
                                     gap: 8,
                                 })}
                             >
-                                <EditIcon />
-                                <Text style={{ ...Typography.button, color: AppColors.white }}>Edit Case</Text>
+                                <AnalyzeIcon />
+                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
+                                    Analyze Case
+                                </Text>
                             </Pressable>
                         </View>
-                        {/* Mark as Complete */}
+                        {/* Edit Case */}
                         {!isCompleted && (
                             <Pressable
                                 onPress={() => setCaseStatus('Completed')}
@@ -608,7 +730,9 @@ export default function CaseDetails() {
                                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                                     <Path d="M20 6L9 17l-5-5" stroke={AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                                 </Svg>
-                                <Text style={{ ...Typography.button, color: AppColors.white }}>Mark as Complete</Text>
+                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
+                                    Mark as Complete
+                                </Text>
                             </Pressable>
                         )}
                     </View>

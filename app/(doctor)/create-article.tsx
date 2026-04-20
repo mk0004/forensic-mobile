@@ -2,22 +2,22 @@ import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput as RNTextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 
-function CloseIcon() {
+/* ─── Icons ─── */
+function BackIcon() {
     return (
-        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 6L6 18M6 6l12 12" stroke={AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+            <Path d="M19 12H5M12 19l-7-7 7-7" stroke={AppColors.textPrimary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
 
 function UploadIcon() {
     return (
-        <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
             <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             <Path d="M17 8l-5-5-5 5" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             <Path d="M12 3v12" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -44,18 +44,51 @@ function RemoveIcon() {
     );
 }
 
+function PostIcon({ active }: { active: boolean }) {
+    return (
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+            <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke={active ? AppColors.primary : '#9CA3AF'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function PublicationIcon({ active }: { active: boolean }) {
+    return (
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+            <Path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke={active ? AppColors.primary : '#9CA3AF'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke={active ? AppColors.primary : '#9CA3AF'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+type FlowType = 'post' | 'publication';
+
 export default function CreateArticle() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const [flow, setFlow] = useState<FlowType>('post');
     const [title, setTitle] = useState('');
     const [body, setBody] = useState('');
     const [hasImage, setHasImage] = useState(false);
     const [showDiscard, setShowDiscard] = useState(false);
+
     const isDirty = title.length > 0 || body.length > 0 || hasImage;
+    const isPost = flow === 'post';
 
     const handleBack = () => {
         if (isDirty) { setShowDiscard(true); } else { router.back(); }
     };
+
+    const handleSwitchFlow = (newFlow: FlowType) => {
+        if (newFlow !== flow) {
+            setFlow(newFlow);
+            setTitle('');
+            setBody('');
+            setHasImage(false);
+        }
+    };
+
+    const canPublish = isPost ? body.trim().length > 0 : title.trim().length > 0 && body.trim().length > 0;
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -63,80 +96,156 @@ export default function CreateArticle() {
                 contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Gradient Header */}
-                <LinearGradient
-                    colors={['#1E2A5E', '#2A3A7E']}
-                    style={{
-                        paddingTop: insets.top + 12,
-                        paddingBottom: 20,
-                        paddingHorizontal: Spacing.md,
-                    }}
-                >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <View>
-                            <Text style={{ fontSize: 22, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.white }}>
-                                Add New Article
-                            </Text>
-                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
-                                Create a new forensic investigation Article
-                            </Text>
-                        </View>
-                        <Pressable onPress={handleBack} hitSlop={12}>
-                            <CloseIcon />
-                        </Pressable>
-                    </View>
-                </LinearGradient>
-
-                {/* Form */}
-                <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 20 }}>
-                    {/* Article Title */}
-                    <View style={{ gap: 8 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                            Article Title <Text style={{ color: '#EF4444' }}>*</Text>
+                {/* Header */}
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: Spacing.md,
+                    paddingTop: insets.top + 8,
+                    paddingBottom: 14,
+                    backgroundColor: AppColors.white,
+                    gap: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F3F4F6',
+                }}>
+                    <Pressable onPress={handleBack} hitSlop={8}>
+                        <BackIcon />
+                    </Pressable>
+                    <Text style={{ ...Typography.h5, color: AppColors.textPrimary, flex: 1 }}>
+                        {isPost ? 'New Post' : 'New Publication'}
+                    </Text>
+                    <Pressable
+                        onPress={() => canPublish && router.back()}
+                        disabled={!canPublish}
+                        style={({ pressed }) => ({
+                            backgroundColor: canPublish
+                                ? (pressed ? AppColors.primaryHover : AppColors.primary)
+                                : '#E5E7EB',
+                            borderRadius: 10,
+                            paddingHorizontal: 18,
+                            paddingVertical: 8,
+                        })}
+                    >
+                        <Text style={{
+                            fontSize: 13,
+                            fontFamily: 'IBMPlexSans_600SemiBold',
+                            color: canPublish ? AppColors.white : '#9CA3AF',
+                        }}>
+                            Publish
                         </Text>
-                        <View
+                    </Pressable>
+                </View>
+
+                <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 20 }}>
+                    {/* Flow selector */}
+                    <View style={{
+                        flexDirection: 'row',
+                        backgroundColor: AppColors.white,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#E5E7EB',
+                        padding: 4,
+                    }}>
+                        <Pressable
+                            onPress={() => handleSwitchFlow('post')}
                             style={{
-                                backgroundColor: AppColors.white,
-                                borderRadius: 10,
-                                borderWidth: 1,
-                                borderColor: '#E5E7EB',
-                                paddingHorizontal: 14,
-                                height: 48,
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
                                 justifyContent: 'center',
+                                gap: 6,
+                                paddingVertical: 10,
+                                borderRadius: 10,
+                                backgroundColor: isPost ? AppColors.primary + '0A' : 'transparent',
+                                borderWidth: isPost ? 1 : 0,
+                                borderColor: AppColors.primary + '20',
                             }}
                         >
-                            <RNTextInput
-                                placeholder="Enter article title"
-                                value={title}
-                                onChangeText={setTitle}
-                                style={{
-                                    fontSize: 14,
-                                    fontFamily: 'IBMPlexSans_400Regular',
-                                    color: AppColors.textPrimary,
-                                }}
-                                placeholderTextColor={AppColors.border}
-                            />
-                        </View>
+                            <PostIcon active={isPost} />
+                            <Text style={{
+                                fontSize: 13,
+                                fontFamily: isPost ? 'IBMPlexSans_600SemiBold' : 'IBMPlexSans_400Regular',
+                                color: isPost ? AppColors.primary : '#9CA3AF',
+                            }}>
+                                Post
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => handleSwitchFlow('publication')}
+                            style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                paddingVertical: 10,
+                                borderRadius: 10,
+                                backgroundColor: !isPost ? AppColors.primary + '0A' : 'transparent',
+                                borderWidth: !isPost ? 1 : 0,
+                                borderColor: AppColors.primary + '20',
+                            }}
+                        >
+                            <PublicationIcon active={!isPost} />
+                            <Text style={{
+                                fontSize: 13,
+                                fontFamily: !isPost ? 'IBMPlexSans_600SemiBold' : 'IBMPlexSans_400Regular',
+                                color: !isPost ? AppColors.primary : '#9CA3AF',
+                            }}>
+                                Publication
+                            </Text>
+                        </Pressable>
                     </View>
 
-                    {/* Write your article */}
+                    {/* Publication: Title field */}
+                    {!isPost && (
+                        <View style={{ gap: 8 }}>
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                                Title <Text style={{ color: '#EF4444' }}>*</Text>
+                            </Text>
+                            <View
+                                style={{
+                                    backgroundColor: AppColors.white,
+                                    borderRadius: 12,
+                                    borderWidth: 1,
+                                    borderColor: '#E5E7EB',
+                                    paddingHorizontal: 14,
+                                    height: 48,
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <RNTextInput
+                                    placeholder="Enter publication title"
+                                    value={title}
+                                    onChangeText={setTitle}
+                                    style={{
+                                        fontSize: 14,
+                                        fontFamily: 'IBMPlexSans_400Regular',
+                                        color: AppColors.textPrimary,
+                                    }}
+                                    placeholderTextColor="#9CA3AF"
+                                />
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Content field */}
                     <View style={{ gap: 8 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                            Write your article <Text style={{ color: '#EF4444' }}>*</Text>
+                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                            {isPost ? 'What\'s on your mind?' : 'Content'} <Text style={{ color: '#EF4444' }}>*</Text>
                         </Text>
                         <View
                             style={{
                                 backgroundColor: AppColors.white,
-                                borderRadius: 10,
+                                borderRadius: 12,
                                 borderWidth: 1,
                                 borderColor: '#E5E7EB',
                                 paddingHorizontal: 14,
                                 paddingVertical: 12,
-                                minHeight: 180,
+                                minHeight: isPost ? 140 : 200,
                             }}
                         >
                             <RNTextInput
-                                placeholder="Write your article......."
+                                placeholder={isPost ? 'Share an update, insight, or finding...' : 'Write your publication content...'}
                                 value={body}
                                 onChangeText={setBody}
                                 multiline
@@ -146,28 +255,33 @@ export default function CreateArticle() {
                                     fontSize: 14,
                                     fontFamily: 'IBMPlexSans_400Regular',
                                     color: AppColors.textPrimary,
-                                    minHeight: 156,
+                                    minHeight: isPost ? 116 : 176,
                                 }}
-                                placeholderTextColor={AppColors.border}
+                                placeholderTextColor="#9CA3AF"
                             />
                         </View>
+                        {/* Character count for posts */}
+                        {isPost && (
+                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB', textAlign: 'right' }}>
+                                {body.length} / 500
+                            </Text>
+                        )}
                     </View>
 
                     {/* Upload Image (Optional) */}
                     <View style={{ gap: 8 }}>
-                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
-                            Upload Image (Optional)
+                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                            Image <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>(optional)</Text>
                         </Text>
                         <View style={{ flexDirection: 'row', gap: 12 }}>
-                            {/* Upload area */}
                             <Pressable
                                 onPress={() => setHasImage(true)}
                                 style={{
                                     flex: 1,
-                                    height: 120,
+                                    height: 100,
                                     borderRadius: 12,
                                     borderWidth: 1.5,
-                                    borderColor: '#D1D5DB',
+                                    borderColor: '#E5E7EB',
                                     borderStyle: 'dashed',
                                     backgroundColor: AppColors.white,
                                     alignItems: 'center',
@@ -176,17 +290,16 @@ export default function CreateArticle() {
                                 }}
                             >
                                 <UploadIcon />
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                    Click to upload
+                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                                    Tap to upload
                                 </Text>
-                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                    Images, or documents
+                                <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>
+                                    JPG, PNG up to 5MB
                                 </Text>
                             </Pressable>
 
-                            {/* Preview thumbnail */}
                             {hasImage && (
-                                <View style={{ width: 120, height: 120, borderRadius: 12, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                                <View style={{ width: 100, height: 100, borderRadius: 12, backgroundColor: '#F3F4F6', overflow: 'hidden' }}>
                                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                                         <ImageIcon />
                                         <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', marginTop: 4 }}>Preview</Text>
@@ -202,33 +315,44 @@ export default function CreateArticle() {
                         </View>
                     </View>
 
-                    {/* Action buttons */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
+                    {/* Bottom action row */}
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
                         <Pressable
                             onPress={handleBack}
                             style={({ pressed }) => ({
-                                backgroundColor: pressed ? '#F3F4F6' : '#E5E7EB',
-                                borderRadius: 10,
+                                flex: 1,
+                                backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
+                                borderRadius: 12,
                                 height: 48,
-                                paddingHorizontal: 28,
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                borderWidth: 1,
+                                borderColor: '#E5E7EB',
                             })}
                         >
-                            <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Cancel</Text>
+                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Cancel</Text>
                         </Pressable>
                         <Pressable
-                            onPress={() => router.back()}
+                            onPress={() => canPublish && router.back()}
+                            disabled={!canPublish}
                             style={({ pressed }) => ({
-                                backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
-                                borderRadius: 10,
+                                flex: 1,
+                                backgroundColor: canPublish
+                                    ? (pressed ? AppColors.primaryHover : AppColors.primary)
+                                    : '#E5E7EB',
+                                borderRadius: 12,
                                 height: 48,
-                                paddingHorizontal: 28,
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             })}
                         >
-                            <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Publish</Text>
+                            <Text style={{
+                                fontSize: 14,
+                                fontFamily: 'IBMPlexSans_600SemiBold',
+                                color: canPublish ? AppColors.white : '#9CA3AF',
+                            }}>
+                                {isPost ? 'Post' : 'Publish'}
+                            </Text>
                         </Pressable>
                     </View>
                 </View>
