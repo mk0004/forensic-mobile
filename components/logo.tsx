@@ -1,16 +1,14 @@
-import { View, Text } from 'react-native';
-import { AppColors, Typography } from '@/constants/theme';
+import { View, Image } from 'react-native';
 
 interface LogoProps {
     size?: 'small' | 'medium' | 'large';
-    color?: string;
 }
 
-export function Logo({ size = 'medium', color = AppColors.primary }: LogoProps) {
+export function Logo({ size = 'medium' }: LogoProps) {
     const dimensions = {
-        small: { width: 60, height: 60, fontSize: 14, iconSize: 28 },
-        medium: { width: 100, height: 100, fontSize: 20, iconSize: 48 },
-        large: { width: 140, height: 140, fontSize: 28, iconSize: 64 },
+        small: { width: 60, height: 60, borderRadius: 12 },
+        medium: { width: 100, height: 100, borderRadius: 20 },
+        large: { width: 140, height: 140, borderRadius: 28 },
     }[size];
 
     return (
@@ -18,22 +16,15 @@ export function Logo({ size = 'medium', color = AppColors.primary }: LogoProps) 
             style={{
                 width: dimensions.width,
                 height: dimensions.height,
-                borderRadius: 20,
-                borderCurve: 'continuous',
-                backgroundColor: color,
-                alignItems: 'center',
-                justifyContent: 'center',
+                borderRadius: dimensions.borderRadius,
+                overflow: 'hidden',
             }}
         >
-            <Text
-                style={{
-                    color: AppColors.white,
-                    fontSize: dimensions.iconSize,
-                    fontFamily: Typography.h1.fontFamily,
-                }}
-            >
-                F
-            </Text>
+            <Image
+                source={require('@/assets/images/forensic-logo.png')}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+            />
         </View>
     );
 }
