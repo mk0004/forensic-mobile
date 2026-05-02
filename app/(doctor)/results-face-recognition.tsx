@@ -6,6 +6,27 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { AddToCaseModal } from '@/components/add-to-case-modal';
 
+type IdentityMatch = {
+    name: string;
+    confidence: number | null;
+    distance: number | null;
+};
+
+function normalizePercent(value: unknown) {
+    if (typeof value !== 'number' || Number.isNaN(value)) return null;
+    return value <= 1 ? value * 100 : value;
+}
+
+function getIdentityName(value: any) {
+    if (typeof value === 'string') return value;
+    return value?.identity || value?.name || value?.person || value?.label || value?.match || 'Unknown';
+}
+
+function getIdentityConfidence(value: any) {
+    if (!value || typeof value === 'string') return null;
+    return normalizePercent(value.confidence ?? value.probability ?? value.score ?? value.similarity);
+}
+
 /* ─── Icons ─── */
 function BackIcon() {
     return (
@@ -62,27 +83,33 @@ export default function ResultsFaceRecognitionScreen() {
     const parsed = useMemo(() => {
         try {
             const raw = JSON.parse(apiData || '{}');
-            // API returns: { identities: ["Name1", "Name2"] }
-            // or: { message: "No match found in database", identities: [] }
-            if (Array.isArray(raw.identities)) {
-                if (raw.identities.length === 0) {
-                    return { identities: [], raw, noMatch: true, noMatchMessage: raw.message || 'No match found in database' };
-                }
-                return { identities: raw.identities, raw, noMatch: false, noMatchMessage: '' };
-            }
-            // Fallback for unexpected format
-            return { identities: [], raw, noMatch: false, noMatchMessage: '' };
+            const rawMatches = raw.identities || raw.matches || raw.results || raw.faces || [];
+            const identities: IdentityMatch[] = Array.isArray(rawMatches)
+                ? rawMatches.map((item: any) => ({
+                    name: getIdentityName(item),
+                    confidence: getIdentityConfidence(item),
+                    distance: typeof item?.distance === 'number' ? item.distance : null,
+                }))
+                : [];
+
+            const noMatch = identities.length === 0 && !!(raw.message || raw.detail || apiData);
+            return {
+                identities,
+                raw,
+                noMatch,
+                noMatchMessage: raw.message || raw.detail || 'No match found in database',
+            };
         } catch {
-            return { identities: [], raw: {}, noMatch: false, noMatchMessage: '' };
+            return { identities: [] as IdentityMatch[], raw: {}, noMatch: false, noMatchMessage: '' };
         }
     }, [apiData]);
 
     const hasResults = parsed.identities.length > 0;
-    const knownIdentities = parsed.identities.filter((name: string) =>
-        !name.toLowerCase().includes('unknown')
+    const knownIdentities = parsed.identities.filter((match) =>
+        !match.name.toLowerCase().includes('unknown')
     );
-    const unknownIdentities = parsed.identities.filter((name: string) =>
-        name.toLowerCase().includes('unknown')
+    const unknownIdentities = parsed.identities.filter((match) =>
+        match.name.toLowerCase().includes('unknown')
     );
 
     return (
@@ -290,7 +317,7 @@ export default function ResultsFaceRecognitionScreen() {
                                         </View>
                                     </View>
 
-                                    {knownIdentities.map((name: string, i: number) => (
+                                    {knownIdentities.map((match, i: number) => (
                                         <View
                                             key={i}
                                             style={{
@@ -311,15 +338,19 @@ export default function ResultsFaceRecognitionScreen() {
                                                 justifyContent: 'center',
                                             }}>
                                                 <Text style={{ fontSize: 18, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
-                                                    {name.charAt(0).toUpperCase()}
+                                                    {match.name.charAt(0).toUpperCase()}
                                                 </Text>
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
-                                                    {name}
+                                                    {match.name}
                                                 </Text>
                                                 <Text style={{ ...Typography.caption, color: '#6B7280', marginTop: 2 }}>
-                                                    Model: ArcFace • Backend: RetinaFace
+                                                    {match.confidence !== null
+                                                        ? `${match.confidence.toFixed(1)}% confidence`
+                                                        : match.distance !== null
+                                                            ? `Distance: ${match.distance.toFixed(4)}`
+                                                            : 'Model: ArcFace - Backend: RetinaFace'}
                                                 </Text>
                                             </View>
                                             <View style={{
@@ -363,7 +394,7 @@ export default function ResultsFaceRecognitionScreen() {
                                         </View>
                                     </View>
 
-                                    {unknownIdentities.map((name: string, i: number) => (
+                                    {unknownIdentities.map((match, i: number) => (
                                         <View
                                             key={i}
                                             style={{
@@ -387,7 +418,7 @@ export default function ResultsFaceRecognitionScreen() {
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                                    {name}
+                                                    {match.name}
                                                 </Text>
                                                 <Text style={{ ...Typography.caption, color: '#9CA3AF', marginTop: 2 }}>
                                                     Not found in database

@@ -6,7 +6,7 @@ import { Typography } from '@/constants/theme';
 interface StatCardProps {
     title: string;
     value: number | string;
-    variant: 'blue' | 'green' | 'teal' | 'red' | 'red';
+    variant: 'blue' | 'green' | 'teal' | 'red';
     fullWidth?: boolean;
     onPress?: () => void;
 }
@@ -58,13 +58,11 @@ const gradients: Record<string, [string, string]> = {
     green: ['#16A34A', '#065F46'],
     teal: ['#0D9488', '#065F46'],
     red: ['#EF4444', '#991B1B'],
-    red: ['#EF4444', '#991B1B'],
 };
 
 const iconMap: Record<string, () => React.JSX.Element> = {
     blue: DoctorIcon,
     green: GroupIcon,
-    red: GroupIcon,
     teal: ClipboardIcon,
     red: GroupIcon,
 };

@@ -94,6 +94,19 @@ function ConfidenceRing({ percentage, color }: { percentage: number; color: stri
 }
 
 /* ─── Detection checks derived from API ─── */
+function normalizePercent(value: unknown) {
+    if (typeof value !== 'number' || Number.isNaN(value)) return null;
+    return value <= 1 ? value * 100 : value;
+}
+
+function normalizeRealFlag(face: any) {
+    if (typeof face?.is_real === 'boolean') return face.is_real;
+    if (typeof face?.real === 'boolean') return face.real;
+    const label = String(face?.label ?? face?.prediction ?? face?.verdict ?? '').toLowerCase();
+    if (label.includes('real') || label.includes('authentic') || label.includes('live')) return true;
+    if (label.includes('fake') || label.includes('spoof') || label.includes('generated')) return false;
+    return false;
+}
 
 export default function ResultsDeepfakeScreen() {
     const router = useRouter();
@@ -121,12 +134,14 @@ export default function ResultsDeepfakeScreen() {
     const parsed = useMemo(() => {
         try {
             const raw = JSON.parse(apiData || '{}');
-            const rawFaces = raw.faces || raw.results || [];
+            const rawFaces = raw.faces || raw.results || raw.detections || (
+                raw.is_real !== undefined || raw.prediction || raw.verdict ? [raw] : []
+            );
 
             const faces = rawFaces.map((f: any, idx: number) => {
-                const isReal = f.is_real ?? false;
-                const score = f.score ?? f.antispoof_score ?? 0;
-                const confidence = isReal ? Math.max(85, (1 - score) * 100) : Math.max(score * 100, 15);
+                const isReal = normalizeRealFlag(f);
+                const score = f.score ?? f.antispoof_score ?? f.probability ?? f.confidence ?? null;
+                const confidence = normalizePercent(f.confidence ?? f.probability ?? f.score) ?? (isReal ? 85 : 75);
                 const faceRegion = f.facial_area || f.face_region || null;
                 return { isReal, score, confidence, faceRegion, raw: f, index: idx };
             });
@@ -135,9 +150,9 @@ export default function ResultsDeepfakeScreen() {
             const realCount = faces.filter((f: any) => f.isReal).length;
             const fakeCount = faces.filter((f: any) => !f.isReal).length;
 
-            return { faces, allReal, realCount, fakeCount, hasData: faces.length > 0 };
+            return { faces, allReal, realCount, fakeCount, hasData: faces.length > 0, message: raw.message || raw.detail || '' };
         } catch {
-            return { faces: [], allReal: false, realCount: 0, fakeCount: 0, hasData: false };
+            return { faces: [], allReal: false, realCount: 0, fakeCount: 0, hasData: false, message: '' };
         }
     }, [apiData]);
 
@@ -307,6 +322,24 @@ export default function ResultsDeepfakeScreen() {
                                 </Text>
                             </Pressable>
                         </View>
+                    ) : !parsed.hasData ? (
+                        <View style={{
+                            backgroundColor: AppColors.white,
+                            borderRadius: 16,
+                            padding: 24,
+                            borderWidth: 1,
+                            borderColor: '#E5E7EB',
+                            gap: 12,
+                            alignItems: 'center',
+                        }}>
+                            <AlertCircle />
+                            <Text style={{ ...Typography.bodyLarge, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary, textAlign: 'center' }}>
+                                No Face Result Available
+                            </Text>
+                            <Text style={{ ...Typography.bodySmall, color: '#6B7280', textAlign: 'center', lineHeight: 20 }}>
+                                {parsed.message || 'The API response did not include a deepfake detection result for this image.'}
+                            </Text>
+                        </View>
                     ) : (
                         <>
                             {/* Overall Verdict */}
@@ -438,7 +471,7 @@ export default function ResultsDeepfakeScreen() {
                                                 Antispoof Score
                                             </Text>
                                             <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                                {face.score != null ? face.score.toFixed(4) : 'N/A'}
+                                                {typeof face.score === 'number' ? face.score.toFixed(4) : 'N/A'}
                                             </Text>
                                         </View>
 

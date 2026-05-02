@@ -110,7 +110,7 @@ export default function ActiveCases() {
                     ) : (
                         <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
                             <EmptyIcon />
-                            <Text style={{ ...Typography.body, color: AppColors.border }}>No active cases yet</Text>
+                            <Text style={{ ...Typography.bodySmall, color: AppColors.border }}>No active cases yet</Text>
                             <Pressable
                                 onPress={() => router.push('/(doctor)/add-case')}
                                 style={({ pressed }) => ({

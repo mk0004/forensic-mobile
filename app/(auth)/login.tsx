@@ -155,7 +155,7 @@ export default function LoginScreen() {
                     {/* Sign up link */}
                     <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4, paddingTop: 12 }}>
                         <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
-                            Don't have an account?
+                            {"Don't have an account?"}
                         </Text>
                         <Pressable onPress={() => router.push('/(auth)/sign-up')} hitSlop={8}>
                             <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>

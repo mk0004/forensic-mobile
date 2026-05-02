@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Image, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,10 +7,39 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DeepFakeIcon, FaceIcon, DnaIcon as DnaModelIcon, ReconstructIcon } from '@/components/model-icons';
-
-const API_BASE = 'https://anastamer-deepface-communicated.hf.space';
+import {
+    DEEPFACE_API_BASE_URL,
+    DEEPFACE_ENDPOINTS,
+    DEFAULT_DETECTOR_BACKEND,
+    DEFAULT_DNA_PANEL,
+    DEFAULT_FACE_MODEL,
+} from '@/constants/deepface-api';
 
 type ModelType = 'deepfake' | 'face' | 'dna' | 'reconstruct';
+
+function getApiErrorMessage(status: number, errorText: string) {
+    let errorMessage = `Server returned ${status}`;
+
+    try {
+        const errorJson = JSON.parse(errorText);
+        if (Array.isArray(errorJson.detail)) {
+            return errorJson.detail
+                .map((item: any) => item?.msg || item?.message || JSON.stringify(item))
+                .join('\n');
+        }
+        return errorJson.error || errorJson.message || errorJson.detail || errorMessage;
+    } catch {
+        return errorText || errorMessage;
+    }
+}
+
+function getUploadMimeType(uri: string) {
+    const cleanUri = uri.split('?')[0]?.toLowerCase() || '';
+    if (cleanUri.endsWith('.png')) return 'image/png';
+    if (cleanUri.endsWith('.webp')) return 'image/webp';
+    if (cleanUri.endsWith('.heic')) return 'image/heic';
+    return 'image/jpeg';
+}
 
 const MODEL_INFO: Record<ModelType, { title: string; subtitle: string }> = {
     deepfake: { title: 'Deep Fake Detection', subtitle: 'Upload an image to check for AI manipulation' },
@@ -86,14 +115,25 @@ export default function ModelUploadScreen() {
     // DNA state
     const [dnaMode, setDnaMode] = useState<'text' | 'file'>('text');
     const [dnaText, setDnaText] = useState('');
-    const [dnaFile, setDnaFile] = useState<{ name: string; uri: string } | null>(null);
+    const [dnaFile, setDnaFile] = useState<{ name: string; uri: string; mimeType?: string } | null>(null);
 
     // Loading state for API calls
     const [loading, setLoading] = useState(false);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
     const canProceed = isDna
         ? (dnaMode === 'text' ? dnaText.trim().length > 0 : dnaFile !== null)
         : imageUri !== null;
+
+    useEffect(() => {
+        if (!loading) return;
+
+        const intervalId = setInterval(() => {
+            setElapsedSeconds((current) => current + 1);
+        }, 1000);
+
+        return () => clearInterval(intervalId);
+    }, [loading]);
 
     async function pickFromCamera() {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -126,7 +166,11 @@ export default function ModelUploadScreen() {
             copyToCacheDirectory: true,
         });
         if (!result.canceled && result.assets[0]) {
-            setDnaFile({ name: result.assets[0].name, uri: result.assets[0].uri });
+            setDnaFile({
+                name: result.assets[0].name,
+                uri: result.assets[0].uri,
+                mimeType: result.assets[0].mimeType,
+            });
         }
     }
 
@@ -135,43 +179,31 @@ export default function ModelUploadScreen() {
 
         // For Deep Fake and Face Recognition — call real API
         if ((model === 'deepfake' || model === 'face') && imageUri) {
+            setElapsedSeconds(0);
             setLoading(true);
             try {
                 const formData = new FormData();
                 formData.append('file', {
                     uri: imageUri,
-                    type: 'image/jpeg',
-                    name: 'upload.jpg',
+                    type: getUploadMimeType(imageUri),
+                    name: `upload.${getUploadMimeType(imageUri).split('/')[1] || 'jpg'}`,
                 } as any);
                 if (model === 'face') {
-                    formData.append('model_name', 'ArcFace');
+                    formData.append('model_name', DEFAULT_FACE_MODEL);
                 }
-                formData.append('detector_backend', 'retinaface');
+                formData.append('detector_backend', DEFAULT_DETECTOR_BACKEND);
 
-                const endpoint = model === 'deepfake' ? '/liveness' : '/recognize';
+                const endpoint = model === 'deepfake' ? DEEPFACE_ENDPOINTS.deepfake : DEEPFACE_ENDPOINTS.recognize;
 
-                // AbortController for timeout
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
-
-                const response = await fetch(`${API_BASE}${endpoint}`, {
+                const response = await fetch(`${DEEPFACE_API_BASE_URL}${endpoint}`, {
                     method: 'POST',
                     body: formData,
-                    signal: controller.signal,
                     // Do NOT set Content-Type manually — RN auto-sets it with the boundary
                 });
 
-                clearTimeout(timeoutId);
-
                 if (!response.ok) {
                     const errorText = await response.text().catch(() => '');
-                    let errorMessage = `Server returned ${response.status}`;
-                    try {
-                        const errorJson = JSON.parse(errorText);
-                        errorMessage = errorJson.error || errorJson.message || errorMessage;
-                    } catch {
-                        if (errorText) errorMessage = errorText;
-                    }
+                    const errorMessage = getApiErrorMessage(response.status, errorText);
                     setLoading(false);
 
                     // Navigate to result page with error instead of Alert
@@ -201,40 +233,132 @@ export default function ModelUploadScreen() {
                 }
             } catch (error: any) {
                 setLoading(false);
-                const isTimeout = error?.name === 'AbortError';
                 const isNetwork = error?.message?.includes('Network request failed');
                 Alert.alert(
                     'Analysis Failed',
-                    isTimeout
-                        ? 'The analysis server is taking too long to respond. The server may be waking up — please try again in a minute.'
-                        : isNetwork
-                            ? 'Cannot reach the analysis server. Please check your internet connection and try again.'
-                            : `Error: ${error?.message || 'Unknown error occurred'}`,
+                    isNetwork
+                        ? 'Cannot reach the analysis server. Please check your internet connection and try again.'
+                        : `Error: ${error?.message || 'Unknown error occurred'}`,
                     [{ text: 'OK' }]
                 );
             }
             return;
         }
 
-        // For DNA — navigate with mock
+        // For DNA — call real API
         if (model === 'dna') {
-            router.push({
-                pathname: '/(doctor)/results-dna',
-                params: {
-                    inputMode: dnaMode,
-                    dnaText: dnaMode === 'text' ? dnaText : '',
-                    fileName: dnaMode === 'file' ? dnaFile?.name || '' : '',
-                },
-            });
+            setElapsedSeconds(0);
+            setLoading(true);
+            try {
+                const formData = new FormData();
+                if (dnaMode === 'text' && dnaText) {
+                    formData.append('sequence', dnaText);
+                } else if (dnaMode === 'file' && dnaFile) {
+                    formData.append('file', {
+                        uri: dnaFile.uri,
+                        type: dnaFile.mimeType || 'text/plain',
+                        name: dnaFile.name,
+                    } as any);
+                } else {
+                    setLoading(false);
+                    Alert.alert('Missing Input', 'Please provide a DNA sequence or upload a file.');
+                    return;
+                }
+                formData.append('panel', DEFAULT_DNA_PANEL);
+
+                const response = await fetch(`${DEEPFACE_API_BASE_URL}${DEEPFACE_ENDPOINTS.dnaPhenotyping}`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    const errorMessage = getApiErrorMessage(response.status, errorText);
+                    setLoading(false);
+                    router.push({
+                        pathname: '/(doctor)/results-dna',
+                        params: {
+                            inputMode: dnaMode,
+                            dnaText: dnaMode === 'text' ? dnaText : '',
+                            fileName: dnaMode === 'file' ? dnaFile?.name || '' : '',
+                            errorData: errorMessage,
+                        },
+                    });
+                    return;
+                }
+
+                const data = await response.json();
+                setLoading(false);
+                router.push({
+                    pathname: '/(doctor)/results-dna',
+                    params: {
+                        inputMode: dnaMode,
+                        dnaText: dnaMode === 'text' ? dnaText : '',
+                        fileName: dnaMode === 'file' ? dnaFile?.name || '' : '',
+                        apiData: JSON.stringify(data),
+                    },
+                });
+            } catch (error: any) {
+                setLoading(false);
+                const isNetwork = error?.message?.includes('Network request failed');
+                Alert.alert(
+                    'Analysis Failed',
+                    isNetwork
+                        ? 'Cannot reach the analysis server. Please check your internet connection and try again.'
+                        : `Error: ${error?.message || 'Unknown error occurred'}`,
+                    [{ text: 'OK' }]
+                );
+            }
             return;
         }
 
-        // For Reconstruct — navigate with mock
-        if (model === 'reconstruct') {
-            router.push({
-                pathname: '/(doctor)/results-reconstruct',
-                params: { imageUri: imageUri || '' },
-            });
+        // For Reconstruct — call real API
+        if (model === 'reconstruct' && imageUri) {
+            setElapsedSeconds(0);
+            setLoading(true);
+            try {
+                const formData = new FormData();
+                formData.append('file', {
+                    uri: imageUri,
+                    type: getUploadMimeType(imageUri),
+                    name: `upload.${getUploadMimeType(imageUri).split('/')[1] || 'jpg'}`,
+                } as any);
+                formData.append('detector_backend', DEFAULT_DETECTOR_BACKEND);
+
+                const response = await fetch(`${DEEPFACE_API_BASE_URL}${DEEPFACE_ENDPOINTS.forensicAnalysis}`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    const errorMessage = getApiErrorMessage(response.status, errorText);
+                    setLoading(false);
+                    router.push({
+                        pathname: '/(doctor)/results-reconstruct',
+                        params: { imageUri, errorData: errorMessage },
+                    });
+                    return;
+                }
+
+                const data = await response.json();
+                setLoading(false);
+                router.push({
+                    pathname: '/(doctor)/results-reconstruct',
+                    params: { imageUri, apiData: JSON.stringify(data) },
+                });
+            } catch (error: any) {
+                setLoading(false);
+                const isNetwork = error?.message?.includes('Network request failed');
+                Alert.alert(
+                    'Analysis Failed',
+                    isNetwork
+                        ? 'Cannot reach the analysis server. Please check your internet connection and try again.'
+                        : `Error: ${error?.message || 'Unknown error occurred'}`,
+                    [{ text: 'OK' }]
+                );
+            }
+            return;
         }
     }
 
@@ -546,7 +670,7 @@ export default function ModelUploadScreen() {
                             <>
                                 <ActivityIndicator color={AppColors.white} size="small" />
                                 <Text style={{ ...Typography.button, color: AppColors.white }}>
-                                    Analyzing...
+                                    Analyze {elapsedSeconds}s
                                 </Text>
                             </>
                         ) : (

@@ -151,7 +151,7 @@ export default function VerificationCodeScreen() {
 
                     <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4 }}>
                         <Text style={{ ...Typography.bodySmall, color: AppColors.textPrimary }}>
-                            Didn't receive code?
+                            {"Didn't receive code?"}
                         </Text>
                         <Pressable hitSlop={8}>
                             <Text
