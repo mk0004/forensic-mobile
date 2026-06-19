@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { CaseCard } from '@/components/ui/case-card';
+import {
+    useActiveCasesQuery,
+    useDeleteCaseMutation,
+    formatCaseDate,
+    caseDisplayId,
+} from '@/lib/hooks/use-cases-api';
 
 function BackIcon() {
     return (
@@ -34,24 +40,18 @@ function EmptyIcon() {
     );
 }
 
-const initialCases = [
-    { title: 'Suspicious Fire Investigation', description: 'Analysis of fire origin and cause determination at the warehouse district.', caseId: 'CASE-001', date: 'Jan 15, 2025' },
-    { title: 'Vehicle Theft Ring', description: 'Multi-county vehicle theft operation involving forged documents and VIN tampering.', caseId: 'CASE-002', date: 'Jan 12, 2025' },
-    { title: 'Cyber Fraud Analysis', description: 'Digital forensic examination of financial transactions linked to phishing.', caseId: 'CASE-003', date: 'Jan 10, 2025' },
-    { title: 'Homicide - Cold Case Review', description: 'Re-examination of physical evidence using updated DNA analysis techniques.', caseId: 'CASE-004', date: 'Jan 8, 2025' },
-    { title: 'Narcotics Lab Evidence', description: 'Chemical analysis and documentation of seized substances and equipment.', caseId: 'CASE-005', date: 'Jan 5, 2025' },
-];
-
 export default function ActiveCases() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const [cases, setCases] = useState(initialCases);
-    const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+    const { data: cases = [], isLoading, isError, error } = useActiveCasesQuery();
+    const deleteCase = useDeleteCaseMutation();
+    const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
     const handleDelete = () => {
-        if (deleteTarget) {
-            setCases(prev => prev.filter(c => c.caseId !== deleteTarget));
-            setDeleteTarget(null);
+        if (deleteTarget !== null) {
+            deleteCase.mutate(deleteTarget, {
+                onSettled: () => setDeleteTarget(null),
+            });
         }
     };
 
@@ -95,18 +95,34 @@ export default function ActiveCases() {
                 </View>
 
                 <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, gap: 12 }}>
-                    {cases.length > 0 ? (
-                        cases.map((c) => (
-                            <CaseCard
-                                key={c.caseId}
-                                title={c.title}
-                                description={c.description}
-                                caseId={c.caseId}
-                                date={c.date}
-                                onEdit={() => router.push({ pathname: '/(doctor)/case-details', params: { caseId: c.caseId, title: c.title, description: c.description, date: c.date } })}
-                                onDelete={() => setDeleteTarget(c.caseId)}
-                            />
-                        ))
+                    {isLoading ? (
+                        <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+                            <ActivityIndicator color={AppColors.primary} />
+                            <Text style={{ ...Typography.bodySmall, color: AppColors.border }}>Loading cases…</Text>
+                        </View>
+                    ) : isError ? (
+                        <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+                            <EmptyIcon />
+                            <Text selectable style={{ ...Typography.bodySmall, color: AppColors.error, textAlign: 'center' }}>
+                                {error instanceof Error ? error.message : 'Failed to load cases.'}
+                            </Text>
+                        </View>
+                    ) : cases.length > 0 ? (
+                        cases.map((c) => {
+                            const displayId = caseDisplayId(c.id);
+                            const date = formatCaseDate(c.created_at);
+                            return (
+                                <CaseCard
+                                    key={c.id}
+                                    title={c.name}
+                                    description={c.description}
+                                    caseId={displayId}
+                                    date={date}
+                                    onEdit={() => router.push({ pathname: '/(doctor)/case-details', params: { caseId: String(c.id), title: c.name, description: c.description, date } })}
+                                    onDelete={() => setDeleteTarget(c.id)}
+                                />
+                            );
+                        })
                     ) : (
                         <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
                             <EmptyIcon />

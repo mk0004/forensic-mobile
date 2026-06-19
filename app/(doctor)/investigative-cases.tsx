@@ -1,11 +1,20 @@
-import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, Modal, Dimensions, TextInput as RNTextInput } from 'react-native';
+import { useState, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, Pressable, Modal, Dimensions, TextInput as RNTextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { CaseCard } from '@/components/ui/case-card';
 import { EditCaseDrawer } from '@/components/edit-case-drawer';
+import {
+    useActiveCasesQuery,
+    useCompletedCasesQuery,
+    useDeleteCaseMutation,
+    useUpdateCaseMutation,
+    formatCaseDate,
+    caseDisplayId,
+} from '@/lib/hooks/use-cases-api';
+import type { Case } from '@/types/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -58,42 +67,55 @@ function CompletedCheckIcon() {
     );
 }
 
-/* ─── Data ─── */
-const activeCasesData = [
-    { title: 'Suspicious Fire Investigation', description: 'Analysis of fire origin and cause determination at the warehouse district.', caseId: 'CASE-001', date: 'Jan 15, 2025' },
-    { title: 'Vehicle Theft Ring', description: 'Multi-county vehicle theft operation involving forged documents and VIN tampering.', caseId: 'CASE-002', date: 'Jan 12, 2025' },
-    { title: 'Cyber Fraud Analysis', description: 'Digital forensic examination of financial transactions linked to phishing.', caseId: 'CASE-003', date: 'Jan 10, 2025' },
-    { title: 'Homicide - Cold Case Review', description: 'Re-examination of physical evidence using updated DNA analysis techniques.', caseId: 'CASE-004', date: 'Jan 8, 2025' },
-    { title: 'Narcotics Lab Evidence', description: 'Chemical analysis and documentation of seized substances and equipment.', caseId: 'CASE-005', date: 'Jan 5, 2025' },
-];
-
-const completedCasesData = [
-    { title: 'Bank Robbery Evidence', description: 'Fingerprint analysis and CCTV footage examination for the downtown bank heist.', caseId: 'CASE-098', date: 'Dec 20, 2024', daysAgo: 26 },
-    { title: 'Missing Person - Jane Doe', description: 'Location triangulation using cellular data and witness testimony cross-reference.', caseId: 'CASE-095', date: 'Dec 15, 2024', daysAgo: 31 },
-    { title: 'Insurance Fraud Investigation', description: 'Document forgery analysis and financial discrepancy identification.', caseId: 'CASE-090', date: 'Dec 8, 2024', daysAgo: 38 },
-    { title: 'Arson Investigation - Maple St', description: 'Accelerant detection and point-of-origin analysis confirming intentional fire.', caseId: 'CASE-087', date: 'Dec 1, 2024', daysAgo: 45 },
-];
-
 const FILTERS = ['All', 'Active', 'Completed'] as const;
 type Filter = typeof FILTERS[number];
+
+type DisplayCase = {
+    id: number;
+    title: string;
+    description: string;
+    caseId: string;
+    date: string;
+    completed: boolean;
+};
+
+function toDisplayCase(c: Case, completed: boolean): DisplayCase {
+    return {
+        id: c.id,
+        title: c.name,
+        description: c.description,
+        caseId: caseDisplayId(c.id),
+        date: formatCaseDate(c.created_at),
+        completed,
+    };
+}
 
 export default function InvestigativeCases() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const activeQuery = useActiveCasesQuery();
+    const completedQuery = useCompletedCasesQuery();
+    const deleteCase = useDeleteCaseMutation();
+    const updateCase = useUpdateCaseMutation();
     const [activeFilter, setActiveFilter] = useState<Filter>('All');
     const [search, setSearch] = useState('');
-    const [activeCases, setActiveCases] = useState(activeCasesData);
-    const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-    const [editTarget, setEditTarget] = useState<{ caseId: string; title: string; description: string } | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+    const [editTarget, setEditTarget] = useState<{ id: number; title: string; description: string } | null>(null);
+
+    const activeCasesList = useMemo(() => activeQuery.data ?? [], [activeQuery.data]);
+    const completedCasesList = useMemo(() => completedQuery.data ?? [], [completedQuery.data]);
+    const isLoading = activeQuery.isLoading || completedQuery.isLoading;
+    const isError = activeQuery.isError || completedQuery.isError;
+    const errorObj = activeQuery.error ?? completedQuery.error;
 
     const getFilteredCases = useCallback(() => {
-        let cases: Array<typeof activeCasesData[0] & { completed?: boolean; daysAgo?: number }> = [];
+        let cases: DisplayCase[] = [];
 
         if (activeFilter === 'Active' || activeFilter === 'All') {
-            cases = [...cases, ...activeCases.map(c => ({ ...c, completed: false }))];
+            cases = [...cases, ...activeCasesList.map(c => toDisplayCase(c, false))];
         }
         if (activeFilter === 'Completed' || activeFilter === 'All') {
-            cases = [...cases, ...completedCasesData.map(c => ({ ...c, completed: true }))];
+            cases = [...cases, ...completedCasesList.map(c => toDisplayCase(c, true))];
         }
 
         if (search.trim()) {
@@ -106,20 +128,20 @@ export default function InvestigativeCases() {
         }
 
         return cases;
-    }, [activeFilter, search, activeCases]);
+    }, [activeFilter, search, activeCasesList, completedCasesList]);
 
     const filteredCases = getFilteredCases();
-    const totalCount = activeCases.length + completedCasesData.length;
+    const activeCount = activeCasesList.length;
+    const completedCount = completedCasesList.length;
+    const totalCount = activeCount + completedCount;
 
     const handleDelete = () => {
-        if (deleteTarget) {
-            setActiveCases(prev => prev.filter(c => c.caseId !== deleteTarget));
-            setDeleteTarget(null);
+        if (deleteTarget !== null) {
+            deleteCase.mutate(deleteTarget, {
+                onSettled: () => setDeleteTarget(null),
+            });
         }
     };
-
-    const activeCount = activeCases.length;
-    const completedCount = completedCasesData.length;
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -265,22 +287,33 @@ export default function InvestigativeCases() {
 
                 {/* Cases list */}
                 <View style={{ paddingHorizontal: Spacing.md, paddingTop: 14, gap: 10 }}>
-                    {filteredCases.length > 0 ? (
+                    {isLoading ? (
+                        <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+                            <ActivityIndicator color={AppColors.primary} />
+                            <Text style={{ ...Typography.bodySmall, color: '#9CA3AF' }}>Loading cases…</Text>
+                        </View>
+                    ) : isError ? (
+                        <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+                            <EmptyIcon />
+                            <Text selectable style={{ ...Typography.bodySmall, color: AppColors.error, textAlign: 'center' }}>
+                                {errorObj instanceof Error ? errorObj.message : 'Failed to load cases.'}
+                            </Text>
+                        </View>
+                    ) : filteredCases.length > 0 ? (
                         filteredCases.map(c => (
                             <CaseCard
-                                key={c.caseId}
+                                key={c.id}
                                 title={c.title}
                                 description={c.description}
                                 caseId={c.caseId}
                                 date={c.date}
                                 completed={c.completed}
-                                daysAgo={c.daysAgo}
                                 onPress={() => router.push({
                                     pathname: '/(doctor)/case-details',
-                                    params: { caseId: c.caseId, title: c.title, description: c.description, date: c.date },
+                                    params: { caseId: String(c.id), title: c.title, description: c.description, date: c.date },
                                 })}
-                                onEdit={() => setEditTarget({ caseId: c.caseId, title: c.title, description: c.description })}
-                                onDelete={!c.completed ? () => setDeleteTarget(c.caseId) : undefined}
+                                onEdit={() => setEditTarget({ id: c.id, title: c.title, description: c.description })}
+                                onDelete={!c.completed ? () => setDeleteTarget(c.id) : undefined}
                             />
                         ))
                     ) : (
@@ -381,14 +414,10 @@ export default function InvestigativeCases() {
                 caseDescription={editTarget?.description || ''}
                 onSave={(newTitle, newDescription) => {
                     if (editTarget) {
-                        setActiveCases(prev =>
-                            prev.map(c =>
-                                c.caseId === editTarget.caseId
-                                    ? { ...c, title: newTitle, description: newDescription }
-                                    : c
-                            )
+                        updateCase.mutate(
+                            { id: editTarget.id, name: newTitle, description: newDescription },
+                            { onSettled: () => setEditTarget(null) }
                         );
-                        setEditTarget(null);
                     }
                 }}
             />

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -7,6 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { EditCaseDrawer } from '@/components/edit-case-drawer';
 import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, ChevronRightIcon as ChevronRightModelIcon } from '@/components/model-icons';
+import {
+    useCaseDetailQuery,
+    useDeleteEvidenceMutation,
+    useUpdateCaseMutation,
+    useToggleActiveCaseMutation,
+    formatCaseDate,
+    caseDisplayId,
+} from '@/lib/hooks/use-cases-api';
+import type { Evidence } from '@/types/api';
 
 /* ─── Icons ─── */
 function BackIcon() {
@@ -123,7 +132,6 @@ const MODEL_RESULTS_ROUTE: Record<string, string> = {
     reconstruct: '/(doctor)/results-reconstruct',
 };
 
-/* ─── Mock evidence data per case ─── */
 type AnalysisEvidence = {
     id: string;
     modelType: string;
@@ -131,7 +139,7 @@ type AnalysisEvidence = {
     date: string;
     verdict: string;
     verdictColor: string;
-    mockData: any;
+    mockData: unknown;
 };
 
 type UserEvidence = {
@@ -142,178 +150,92 @@ type UserEvidence = {
     description: string;
 };
 
-type CaseEvidence = {
-    analyses: AnalysisEvidence[];
-    userEvidence: UserEvidence[];
+const MODEL_TYPE_NAMES: Record<string, string> = {
+    deepfake: 'Deep Fake Detection',
+    face: 'Face Recognition',
+    dna: 'DNA Phenotype Prediction',
+    reconstruct: 'Reconstruct Image',
 };
 
-const CASE_EVIDENCE: Record<string, CaseEvidence> = {
-    'CASE-001': {
-        analyses: [
-            {
-                id: 'a1',
-                modelType: 'deepfake',
-                modelName: 'Deep Fake Detection',
-                date: 'Jan 15, 2025',
-                verdict: 'REAL — 94.2%',
-                verdictColor: AppColors.success,
-                mockData: {
-                    results: [{
-                        is_real: true,
-                        antispoof_score: 0.942,
-                        facial_area: { x: 120, y: 80, w: 200, h: 250 },
-                    }],
-                },
-            },
-        ],
-        userEvidence: [
-            { id: 'u1', name: 'suspect_photo_01.jpg', type: 'Image', date: 'Jan 14, 2025', description: 'Photograph from surveillance camera at warehouse entrance' },
-        ],
-    },
-    'CASE-002': {
-        analyses: [
-            {
-                id: 'a2',
-                modelType: 'face',
-                modelName: 'Face Recognition',
-                date: 'Jan 12, 2025',
-                verdict: 'Match Found — 87.3%',
-                verdictColor: AppColors.success,
-                mockData: {
-                    results: [{
-                        identity: 'db/john_doe.jpg',
-                        distance: 0.127,
-                        threshold: 0.4,
-                        verified: true,
-                        facial_area: { x: 100, y: 60, w: 180, h: 220 },
-                        model: 'ArcFace',
-                        detector_backend: 'retinaface',
-                    }],
-                },
-            },
-        ],
-        userEvidence: [
-            { id: 'u2', name: 'forged_registration.pdf', type: 'Document', date: 'Jan 11, 2025', description: 'Suspected forged vehicle registration document' },
-        ],
-    },
-    'CASE-003': {
-        analyses: [
-            {
-                id: 'a3',
-                modelType: 'dna',
-                modelName: 'DNA Phenotype Prediction',
-                date: 'Jan 10, 2025',
-                verdict: 'Analysis Complete',
-                verdictColor: AppColors.primary,
-                mockData: {},
-            },
-            {
-                id: 'a4',
-                modelType: 'deepfake',
-                modelName: 'Deep Fake Detection',
-                date: 'Jan 9, 2025',
-                verdict: 'FAKE — 23.1%',
-                verdictColor: AppColors.error,
-                mockData: {
-                    results: [{
-                        is_real: false,
-                        antispoof_score: 0.231,
-                        facial_area: { x: 95, y: 70, w: 190, h: 230 },
-                    }],
-                },
-            },
-        ],
-        userEvidence: [],
-    },
-    'CASE-004': {
-        analyses: [
-            {
-                id: 'a5',
-                modelType: 'dna',
-                modelName: 'DNA Phenotype Prediction',
-                date: 'Jan 8, 2025',
-                verdict: 'Analysis Complete',
-                verdictColor: AppColors.primary,
-                mockData: {},
-            },
-            {
-                id: 'a6',
-                modelType: 'dna',
-                modelName: 'DNA Phenotype Prediction',
-                date: 'Jan 7, 2025',
-                verdict: 'Analysis Complete',
-                verdictColor: AppColors.primary,
-                mockData: {},
-            },
-            {
-                id: 'a7',
-                modelType: 'face',
-                modelName: 'Face Recognition',
-                date: 'Jan 6, 2025',
-                verdict: 'No Match — 34.5%',
-                verdictColor: '#F59E0B',
-                mockData: {
-                    results: [{
-                        identity: 'unknown',
-                        distance: 0.655,
-                        threshold: 0.4,
-                        verified: false,
-                        facial_area: { x: 110, y: 75, w: 170, h: 210 },
-                        model: 'ArcFace',
-                        detector_backend: 'retinaface',
-                    }],
-                },
-            },
-        ],
-        userEvidence: [],
-    },
-    'CASE-005': {
-        analyses: [
-            {
-                id: 'a8',
-                modelType: 'reconstruct',
-                modelName: 'Reconstruct Image',
-                date: 'Jan 5, 2025',
-                verdict: 'Enhanced — 4x',
-                verdictColor: AppColors.secondary,
-                mockData: {},
-            },
-        ],
-        userEvidence: [
-            { id: 'u3', name: 'lab_samples_report.pdf', type: 'Document', date: 'Jan 4, 2025', description: 'Chemical analysis report of seized substances' },
-        ],
-    },
-};
+function normalizeModelType(modelUsed?: string): string | null {
+    if (!modelUsed) {
+        return null;
+    }
+    const value = modelUsed.toLowerCase();
+    if (value.includes('deepfake') || value.includes('deep fake') || value.includes('spoof')) {
+        return 'deepfake';
+    }
+    if (value.includes('face')) {
+        return 'face';
+    }
+    if (value.includes('dna') || value.includes('phenotype')) {
+        return 'dna';
+    }
+    if (value.includes('reconstruct') || value.includes('enhance')) {
+        return 'reconstruct';
+    }
+    return null;
+}
 
-const CASE_META: Record<string, { team: string; status: string }> = {
-    'CASE-001': { team: 'Dr. Smith, Det. Johnson', status: 'Active' },
-    'CASE-002': { team: 'Dr. Martinez, Det. Lee', status: 'Active' },
-    'CASE-003': { team: 'Dr. Chen, Det. Williams', status: 'Active' },
-    'CASE-004': { team: 'Dr. Patel, Det. Brown', status: 'Active' },
-    'CASE-005': { team: 'Dr. Kim, Det. Davis', status: 'Active' },
-    'CASE-098': { team: 'Dr. Smith, Det. Johnson', status: 'Completed' },
-    'CASE-095': { team: 'Dr. Martinez, Det. Lee', status: 'Completed' },
-    'CASE-090': { team: 'Dr. Chen, Det. Williams', status: 'Completed' },
-    'CASE-087': { team: 'Dr. Patel, Det. Brown', status: 'Completed' },
-};
+function splitEvidence(evidence: Evidence[]): { analyses: AnalysisEvidence[]; userEvidence: UserEvidence[] } {
+    const analyses: AnalysisEvidence[] = [];
+    const userEvidence: UserEvidence[] = [];
+
+    for (const item of evidence) {
+        const modelType = normalizeModelType(item.model_used);
+        if (modelType) {
+            analyses.push({
+                id: String(item.id),
+                modelType,
+                modelName: MODEL_TYPE_NAMES[modelType] ?? item.model_used,
+                date: '',
+                verdict: 'Analysis Complete',
+                verdictColor: AppColors.primary,
+                mockData: item.data ?? {},
+            });
+        } else {
+            userEvidence.push({
+                id: String(item.id),
+                name: item.name,
+                type: 'Evidence',
+                date: '',
+                description: '',
+            });
+        }
+    }
+
+    return { analyses, userEvidence };
+}
 
 export default function CaseDetails() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams<{ caseId: string; title: string; description: string; date: string }>();
 
-    const caseId = params.caseId || 'CASE-000';
-    const evidence = CASE_EVIDENCE[caseId] || { analyses: [], userEvidence: [] };
-    const meta = CASE_META[caseId] || { team: 'Unassigned', status: 'Active' };
+    const caseId = params.caseId || '';
+    const caseQuery = useCaseDetailQuery(caseId);
+    const deleteEvidence = useDeleteEvidenceMutation();
+    const updateCase = useUpdateCaseMutation();
+    const toggleActiveCase = useToggleActiveCaseMutation();
 
-    const [caseTitle, setCaseTitle] = useState(params.title || '');
-    const [caseDescription, setCaseDescription] = useState(params.description || '');
+    const fetchedCase = caseQuery.data;
+    const evidence = splitEvidence(fetchedCase?.evidence ?? []);
+
+    const caseTitle = fetchedCase?.name || params.title || '';
+    const caseDescription = fetchedCase?.description || params.description || '';
+    const caseDate = formatCaseDate(fetchedCase?.created_at) !== 'N/A'
+        ? formatCaseDate(fetchedCase?.created_at)
+        : (params.date || 'N/A');
+    const displayCaseId = fetchedCase ? caseDisplayId(fetchedCase.id) : caseDisplayId(caseId || '000');
+
     const [editDrawerVisible, setEditDrawerVisible] = useState(false);
-    const [caseStatus, setCaseStatus] = useState(meta.status);
-    const [userEvidence, setUserEvidence] = useState(evidence.userEvidence);
     const [deleteTarget, setDeleteTarget] = useState<UserEvidence | null>(null);
+
+    const isCompleted = (fetchedCase?.status ?? 'active').toLowerCase() === 'completed';
+    const caseStatus = isCompleted ? 'Completed' : 'Active';
+    const userEvidence = evidence.userEvidence;
     const totalEvidence = evidence.analyses.length + userEvidence.length;
-    const isCompleted = caseStatus === 'Completed';
+    const team = 'Unassigned';
 
     function handleAnalysisTap(analysis: AnalysisEvidence) {
         const route = MODEL_RESULTS_ROUTE[analysis.modelType];
@@ -391,6 +313,29 @@ export default function CaseDetails() {
                     )}
                 </View>
 
+                {caseQuery.isLoading ? (
+                    <View style={{ alignItems: 'center', paddingTop: 80, gap: 12 }}>
+                        <ActivityIndicator color={AppColors.primary} />
+                        <Text style={{ ...Typography.bodySmall, color: '#9CA3AF' }}>Loading case…</Text>
+                    </View>
+                ) : caseQuery.isError ? (
+                    <View style={{ alignItems: 'center', paddingTop: 80, gap: 12, paddingHorizontal: Spacing.md }}>
+                        <Text selectable style={{ ...Typography.bodySmall, color: AppColors.error, textAlign: 'center' }}>
+                            {caseQuery.error instanceof Error ? caseQuery.error.message : 'Failed to load case.'}
+                        </Text>
+                        <Pressable
+                            onPress={() => caseQuery.refetch()}
+                            style={({ pressed }) => ({
+                                backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
+                                borderRadius: 10,
+                                paddingHorizontal: 20,
+                                paddingVertical: 10,
+                            })}
+                        >
+                            <Text style={{ ...Typography.button, color: AppColors.white, fontSize: 13 }}>Retry</Text>
+                        </Pressable>
+                    </View>
+                ) : (
                 <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 16 }}>
                     {/* Case Info Card */}
                     <View style={{
@@ -407,7 +352,7 @@ export default function CaseDetails() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                 <FolderIcon />
                                 <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
-                                    {caseId}
+                                    {displayCaseId}
                                 </Text>
                             </View>
                             <View style={{
@@ -451,13 +396,13 @@ export default function CaseDetails() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 <CalendarIcon />
                                 <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                    {params.date || 'N/A'}
+                                    {caseDate}
                                 </Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 <TeamIcon />
                                 <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }} numberOfLines={1}>
-                                    {meta.team}
+                                    {team}
                                 </Text>
                             </View>
                         </View>
@@ -716,7 +661,12 @@ export default function CaseDetails() {
                         {/* Edit Case */}
                         {!isCompleted && (
                             <Pressable
-                                onPress={() => setCaseStatus('Completed')}
+                                onPress={() => {
+                                    if (fetchedCase) {
+                                        toggleActiveCase.mutate(fetchedCase.id);
+                                    }
+                                }}
+                                disabled={toggleActiveCase.isPending || !fetchedCase}
                                 style={({ pressed }) => ({
                                     flexDirection: 'row',
                                     backgroundColor: pressed ? '#15803d' : AppColors.success,
@@ -725,18 +675,26 @@ export default function CaseDetails() {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     gap: 8,
+                                    opacity: toggleActiveCase.isPending ? 0.7 : 1,
                                 })}
                             >
-                                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                                    <Path d="M20 6L9 17l-5-5" stroke={AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                </Svg>
-                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
-                                    Mark as Complete
-                                </Text>
+                                {toggleActiveCase.isPending ? (
+                                    <ActivityIndicator color={AppColors.white} />
+                                ) : (
+                                    <>
+                                        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                                            <Path d="M20 6L9 17l-5-5" stroke={AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                        </Svg>
+                                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
+                                            Mark as Complete
+                                        </Text>
+                                    </>
+                                )}
                             </Pressable>
                         )}
                     </View>
                 </View>
+                )}
             </ScrollView>
 
             <EditCaseDrawer
@@ -745,9 +703,14 @@ export default function CaseDetails() {
                 caseTitle={caseTitle}
                 caseDescription={caseDescription}
                 onSave={(newTitle, newDescription) => {
-                    setCaseTitle(newTitle);
-                    setCaseDescription(newDescription);
-                    setEditDrawerVisible(false);
+                    if (fetchedCase) {
+                        updateCase.mutate(
+                            { id: fetchedCase.id, name: newTitle, description: newDescription },
+                            { onSettled: () => setEditDrawerVisible(false) }
+                        );
+                    } else {
+                        setEditDrawerVisible(false);
+                    }
                 }}
             />
 
@@ -810,11 +773,16 @@ export default function CaseDetails() {
                             </Pressable>
                             <Pressable
                                 onPress={() => {
-                                    if (deleteTarget) {
-                                        setUserEvidence((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+                                    if (deleteTarget && fetchedCase) {
+                                        deleteEvidence.mutate(
+                                            { evidenceId: deleteTarget.id, caseId: fetchedCase.id },
+                                            { onSettled: () => setDeleteTarget(null) }
+                                        );
+                                    } else {
+                                        setDeleteTarget(null);
                                     }
-                                    setDeleteTarget(null);
                                 }}
+                                disabled={deleteEvidence.isPending}
                                 style={({ pressed }) => ({
                                     flex: 1,
                                     height: 44,
@@ -822,9 +790,14 @@ export default function CaseDetails() {
                                     backgroundColor: pressed ? '#DC2626' : '#EF4444',
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    opacity: deleteEvidence.isPending ? 0.7 : 1,
                                 })}
                             >
-                                <Text style={{ ...Typography.button, color: AppColors.white }}>Delete</Text>
+                                {deleteEvidence.isPending ? (
+                                    <ActivityIndicator color={AppColors.white} />
+                                ) : (
+                                    <Text style={{ ...Typography.button, color: AppColors.white }}>Delete</Text>
+                                )}
                             </Pressable>
                         </View>
                     </View>

@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput as RNTextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
+import { useAuth } from '@/lib/auth-context';
+import { useCreateCaseMutation } from '@/lib/hooks/use-cases-api';
+import { ApiError } from '@/lib/api-client';
 
 function BackIcon() {
     return (
@@ -31,14 +34,43 @@ function CaseIcon() {
 export default function AddCase() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
+    const createCase = useCreateCaseMutation();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [showDiscard, setShowDiscard] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const isDirty = title.length > 0 || description.length > 0;
 
     const handleBack = () => {
         if (isDirty) { setShowDiscard(true); } else { router.back(); }
     };
+
+    const handleCreate = () => {
+        setErrorMessage(null);
+        if (!user?.id) {
+            setErrorMessage('You must be signed in to create a case.');
+            return;
+        }
+        createCase.mutate(
+            {
+                name: title.trim(),
+                description: description.trim(),
+                status: 'active',
+                user_id: user.id,
+            },
+            {
+                onSuccess: () => {
+                    router.back();
+                },
+                onError: (err) => {
+                    setErrorMessage(err instanceof ApiError ? err.message : 'Failed to create case. Please try again.');
+                },
+            }
+        );
+    };
+
+    const isCreating = createCase.isPending;
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -176,10 +208,20 @@ export default function AddCase() {
                         </View>
                     </View>
 
+                    {/* Error message */}
+                    {errorMessage && (
+                        <View style={{ backgroundColor: AppColors.error + '12', borderRadius: 10, padding: 12 }}>
+                            <Text selectable style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.error }}>
+                                {errorMessage}
+                            </Text>
+                        </View>
+                    )}
+
                     {/* Action Buttons */}
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
                         <Pressable
                             onPress={handleBack}
+                            disabled={isCreating}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
@@ -189,23 +231,28 @@ export default function AddCase() {
                                 height: 52,
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                opacity: isCreating ? 0.6 : 1,
                             })}
                         >
                             <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Cancel</Text>
                         </Pressable>
                         <Pressable
-                            onPress={() => router.back()}
-                            disabled={!title.trim()}
+                            onPress={handleCreate}
+                            disabled={!title.trim() || isCreating}
                             style={({ pressed }) => ({
                                 flex: 1,
-                                backgroundColor: !title.trim() ? '#E5E7EB' : (pressed ? AppColors.primaryHover : AppColors.primary),
+                                backgroundColor: (!title.trim() || isCreating) ? '#E5E7EB' : (pressed ? AppColors.primaryHover : AppColors.primary),
                                 borderRadius: 14,
                                 height: 52,
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             })}
                         >
-                            <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: !title.trim() ? '#9CA3AF' : AppColors.white }}>Create Case</Text>
+                            {isCreating ? (
+                                <ActivityIndicator color={AppColors.primary} />
+                            ) : (
+                                <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: !title.trim() ? '#9CA3AF' : AppColors.white }}>Create Case</Text>
+                            )}
                         </Pressable>
                     </View>
                 </View>

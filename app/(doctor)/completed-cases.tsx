@@ -1,9 +1,26 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { CaseCard } from '@/components/ui/case-card';
+import {
+    useCompletedCasesQuery,
+    formatCaseDate,
+    caseDisplayId,
+} from '@/lib/hooks/use-cases-api';
+
+function daysSince(createdAt?: string): number | undefined {
+    if (!createdAt) {
+        return undefined;
+    }
+    const parsed = new Date(createdAt);
+    if (Number.isNaN(parsed.getTime())) {
+        return undefined;
+    }
+    const diffMs = Date.now() - parsed.getTime();
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
 
 function BackIcon() {
     return (
@@ -19,16 +36,10 @@ function BackIcon() {
     );
 }
 
-const completedCases = [
-    { title: 'Bank Robbery Evidence', description: 'Fingerprint analysis and CCTV footage examination for the downtown bank heist.', caseId: 'CASE-098', date: 'Dec 20, 2024', daysAgo: 26 },
-    { title: 'Missing Person - Jane Doe', description: 'Location triangulation using cellular data and witness testimony cross-reference.', caseId: 'CASE-095', date: 'Dec 15, 2024', daysAgo: 31 },
-    { title: 'Insurance Fraud Investigation', description: 'Document forgery analysis and financial discrepancy identification.', caseId: 'CASE-090', date: 'Dec 8, 2024', daysAgo: 38 },
-    { title: 'Arson Investigation - Maple St', description: 'Accelerant detection and point-of-origin analysis confirming intentional fire.', caseId: 'CASE-087', date: 'Dec 1, 2024', daysAgo: 45 },
-];
-
 export default function CompletedCases() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { data: completedCases = [], isLoading, isError, error } = useCompletedCasesQuery();
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -70,18 +81,39 @@ export default function CompletedCases() {
                 </View>
 
                 <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, gap: 12 }}>
-                    {completedCases.map((c) => (
-                        <CaseCard
-                            key={c.caseId}
-                            title={c.title}
-                            description={c.description}
-                            caseId={c.caseId}
-                            date={c.date}
-                            completed
-                            daysAgo={c.daysAgo}
-                            onEdit={() => router.push({ pathname: '/(doctor)/case-details', params: { caseId: c.caseId, title: c.title, description: c.description, date: c.date } })}
-                        />
-                    ))}
+                    {isLoading ? (
+                        <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+                            <ActivityIndicator color={AppColors.primary} />
+                            <Text style={{ ...Typography.bodySmall, color: AppColors.border }}>Loading cases…</Text>
+                        </View>
+                    ) : isError ? (
+                        <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+                            <Text selectable style={{ ...Typography.bodySmall, color: AppColors.error, textAlign: 'center' }}>
+                                {error instanceof Error ? error.message : 'Failed to load cases.'}
+                            </Text>
+                        </View>
+                    ) : completedCases.length > 0 ? (
+                        completedCases.map((c) => {
+                            const displayId = caseDisplayId(c.id);
+                            const date = formatCaseDate(c.created_at);
+                            return (
+                                <CaseCard
+                                    key={c.id}
+                                    title={c.name}
+                                    description={c.description}
+                                    caseId={displayId}
+                                    date={date}
+                                    completed
+                                    daysAgo={daysSince(c.created_at)}
+                                    onEdit={() => router.push({ pathname: '/(doctor)/case-details', params: { caseId: String(c.id), title: c.name, description: c.description, date } })}
+                                />
+                            );
+                        })
+                    ) : (
+                        <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+                            <Text style={{ ...Typography.bodySmall, color: AppColors.border }}>No completed cases yet</Text>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </View>

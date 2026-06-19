@@ -1,19 +1,20 @@
 import { useState, useMemo } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Dimensions } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { BottomDrawer } from '@/components/bottom-drawer';
+import { useActiveCasesQuery, formatCaseDate, caseDisplayId } from '@/lib/hooks/use-cases-api';
+import { useSaveAsEvidenceMutation } from '@/lib/hooks/use-evidence-api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-/* ─── Mock case data ─── */
-const CASES = [
-    { id: 'CASE-001', title: 'Suspicious Fire Investigation', description: 'Analysis of fire origin and cause determination at the warehouse district.', date: 'Jan 15, 2025' },
-    { id: 'CASE-002', title: 'Vehicle Theft Ring', description: 'Multi-county vehicle theft operation involving forged documents and VIN tampering.', date: 'Jan 12, 2025' },
-    { id: 'CASE-003', title: 'Cyber Fraud Analysis', description: 'Digital forensic examination of financial transactions linked to phishing.', date: 'Jan 10, 2025' },
-    { id: 'CASE-004', title: 'Homicide - Cold Case Review', description: 'Re-examination of physical evidence using updated DNA analysis techniques.', date: 'Jan 8, 2025' },
-    { id: 'CASE-005', title: 'Narcotics Lab Evidence', description: 'Chemical analysis and documentation of seized substances and equipment.', date: 'Jan 5, 2025' },
-];
+interface CaseOption {
+    id: number;
+    displayId: string;
+    title: string;
+    description: string;
+    date: string;
+}
 
 function SearchIcon() {
     return (
@@ -34,34 +35,66 @@ function CheckIcon() {
 type Props = {
     visible: boolean;
     onClose: () => void;
-    onSuccess?: (caseId: string) => void;
+    onSuccess?: (caseId: number) => void;
+    modelUsed?: string;
+    resultData?: Record<string, unknown>;
 };
 
-export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
+export function AddToCaseModal({ visible, onClose, onSuccess, modelUsed, resultData }: Props) {
+    const { data: cases, isLoading: casesLoading } = useActiveCasesQuery();
+    const saveEvidence = useSaveAsEvidenceMutation();
     const [search, setSearch] = useState('');
-    const [selectedCase, setSelectedCase] = useState<typeof CASES[0] | null>(null);
+    const [selectedCase, setSelectedCase] = useState<CaseOption | null>(null);
     const [evidenceTitle, setEvidenceTitle] = useState('');
     const [evidenceDescription, setEvidenceDescription] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
 
+    const caseOptions = useMemo<CaseOption[]>(
+        () =>
+            (cases ?? []).map((c) => ({
+                id: c.id,
+                displayId: caseDisplayId(c.id),
+                title: c.name,
+                description: c.description,
+                date: formatCaseDate(c.created_at),
+            })),
+        [cases],
+    );
+
     const filtered = useMemo(() => {
-        if (!search.trim()) return CASES;
+        if (!search.trim()) return caseOptions;
         const q = search.toLowerCase();
-        return CASES.filter(c => c.title.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
-    }, [search]);
+        return caseOptions.filter(c => c.title.toLowerCase().includes(q) || c.displayId.toLowerCase().includes(q));
+    }, [search, caseOptions]);
 
     function handleConfirm() {
         if (!selectedCase || !evidenceTitle.trim()) return;
-        setShowSuccess(true);
-        setTimeout(() => {
-            setShowSuccess(false);
-            setSelectedCase(null);
-            setEvidenceTitle('');
-            setEvidenceDescription('');
-            setSearch('');
-            onSuccess?.(selectedCase.id);
-            onClose();
-        }, 1800);
+        const caseId = selectedCase.id;
+        saveEvidence.mutate(
+            {
+                name: evidenceTitle.trim(),
+                model_used: modelUsed ?? '',
+                case_id: caseId,
+                data: {
+                    ...(resultData ?? {}),
+                    ...(evidenceDescription.trim() ? { description: evidenceDescription.trim() } : {}),
+                },
+            },
+            {
+                onSuccess: () => {
+                    setShowSuccess(true);
+                    setTimeout(() => {
+                        setShowSuccess(false);
+                        setSelectedCase(null);
+                        setEvidenceTitle('');
+                        setEvidenceDescription('');
+                        setSearch('');
+                        onSuccess?.(caseId);
+                        onClose();
+                    }, 1800);
+                },
+            },
+        );
     }
 
     function handleClose() {
@@ -108,7 +141,7 @@ export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
                         Evidence Added
                     </Text>
                     <Text style={{ ...Typography.bodySmall, color: '#6B7280', textAlign: 'center', paddingHorizontal: 32 }}>
-                        Evidence added to {selectedCase?.id}
+                        Evidence added to {selectedCase?.displayId}
                     </Text>
                 </View>
             )}
@@ -132,7 +165,7 @@ export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
                             {selectedCase.description}
                         </Text>
                         <Text style={{ ...Typography.caption, color: '#9CA3AF', marginTop: 6 }}>
-                            {selectedCase.id} • {selectedCase.date}
+                            {selectedCase.displayId} • {selectedCase.date}
                         </Text>
                     </View>
 
@@ -207,7 +240,7 @@ export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
                         </Pressable>
                         <Pressable
                             onPress={handleConfirm}
-                            disabled={!evidenceTitle.trim()}
+                            disabled={!evidenceTitle.trim() || saveEvidence.isPending}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 paddingVertical: 14,
@@ -220,9 +253,13 @@ export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
                                         : AppColors.primary,
                             })}
                         >
-                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
-                                Confirm
-                            </Text>
+                            {saveEvidence.isPending ? (
+                                <ActivityIndicator color={AppColors.white} />
+                            ) : (
+                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
+                                    Confirm
+                                </Text>
+                            )}
                         </Pressable>
                     </View>
                 </View>
@@ -256,9 +293,15 @@ export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
                         />
                     </View>
 
-                    {filtered.map((c) => (
+                    {casesLoading && (
+                        <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                            <ActivityIndicator color={AppColors.primary} />
+                        </View>
+                    )}
+
+                    {!casesLoading && filtered.map((c) => (
                         <Pressable
-                            key={c.id}
+                            key={c.displayId}
                             onPress={() => setSelectedCase(c)}
                             style={({ pressed }) => ({
                                 backgroundColor: pressed ? '#F0F4FF' : AppColors.white,
@@ -278,7 +321,7 @@ export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
                                     </Text>
                                 </View>
                                 <Text style={{ ...Typography.caption, color: '#9CA3AF', marginLeft: 8 }}>
-                                    {c.id}
+                                    {c.displayId}
                                 </Text>
                             </View>
                             <Text style={{ ...Typography.caption, color: '#9CA3AF', marginTop: 6 }}>
@@ -287,7 +330,7 @@ export function AddToCaseModal({ visible, onClose, onSuccess }: Props) {
                         </Pressable>
                     ))}
 
-                    {filtered.length === 0 && (
+                    {!casesLoading && filtered.length === 0 && (
                         <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                             <Text style={{ ...Typography.bodySmall, color: '#9CA3AF' }}>
                                 No cases found
