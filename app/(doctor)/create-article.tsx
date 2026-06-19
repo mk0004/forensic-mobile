@@ -1,10 +1,20 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput as RNTextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
+import { useAddArticleMutation, useAddFeedMutation, type PickedImage } from '@/lib/hooks/use-community-api';
+
+function getUploadMimeType(uri: string) {
+    const cleanUri = uri.split('?')[0]?.toLowerCase() || '';
+    if (cleanUri.endsWith('.png')) return 'image/png';
+    if (cleanUri.endsWith('.webp')) return 'image/webp';
+    if (cleanUri.endsWith('.heic')) return 'image/heic';
+    return 'image/jpeg';
+}
 
 /* ─── Icons ─── */
 function BackIcon() {
@@ -21,16 +31,6 @@ function UploadIcon() {
             <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             <Path d="M17 8l-5-5-5 5" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             <Path d="M12 3v12" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
-function ImageIcon() {
-    return (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z" stroke="#6B7280" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-            <Path d="M3 16l5-5 4 4 3-3 6 6" stroke="#6B7280" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-            <Circle cx={8.5} cy={8.5} r={1.5} fill="#6B7280" />
         </Svg>
     );
 }
@@ -69,9 +69,19 @@ export default function CreateArticle() {
     const [flow, setFlow] = useState<FlowType>('post');
     const [title, setTitle] = useState('');
     const [body, setBody] = useState('');
-    const [hasImage, setHasImage] = useState(false);
+    const [imageUri, setImageUri] = useState<string | null>(null);
     const [showDiscard, setShowDiscard] = useState(false);
 
+    const addArticle = useAddArticleMutation();
+    const addFeed = useAddFeedMutation();
+    const isPending = addArticle.isPending || addFeed.isPending;
+    const errorMessage = addArticle.error instanceof Error
+        ? addArticle.error.message
+        : addFeed.error instanceof Error
+            ? addFeed.error.message
+            : null;
+
+    const hasImage = imageUri !== null;
     const isDirty = title.length > 0 || body.length > 0 || hasImage;
     const isPost = flow === 'post';
 
@@ -84,11 +94,33 @@ export default function CreateArticle() {
             setFlow(newFlow);
             setTitle('');
             setBody('');
-            setHasImage(false);
+            setImageUri(null);
         }
     };
 
+    async function pickImage() {
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+        if (!result.canceled && result.assets[0]) {
+            setImageUri(result.assets[0].uri);
+        }
+    }
+
     const canPublish = isPost ? body.trim().length > 0 : title.trim().length > 0 && body.trim().length > 0;
+
+    const handlePublish = () => {
+        if (!canPublish || isPending) return;
+        const onSuccess = () => router.back();
+        if (isPost) {
+            addFeed.mutate({ title: title.trim() || body.trim().slice(0, 80), content: body.trim() }, { onSuccess });
+            return;
+        }
+        let image: PickedImage | undefined;
+        if (imageUri) {
+            const type = getUploadMimeType(imageUri);
+            image = { uri: imageUri, type, name: `upload.${type.split('/')[1] || 'jpg'}` };
+        }
+        addArticle.mutate({ title: title.trim(), content: body.trim(), image }, { onSuccess });
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -115,8 +147,8 @@ export default function CreateArticle() {
                         {isPost ? 'New Post' : 'New Publication'}
                     </Text>
                     <Pressable
-                        onPress={() => canPublish && router.back()}
-                        disabled={!canPublish}
+                        onPress={handlePublish}
+                        disabled={!canPublish || isPending}
                         style={({ pressed }) => ({
                             backgroundColor: canPublish
                                 ? (pressed ? AppColors.primaryHover : AppColors.primary)
@@ -124,15 +156,22 @@ export default function CreateArticle() {
                             borderRadius: 10,
                             paddingHorizontal: 18,
                             paddingVertical: 8,
+                            minWidth: 76,
+                            alignItems: 'center',
+                            justifyContent: 'center',
                         })}
                     >
-                        <Text style={{
-                            fontSize: 13,
-                            fontFamily: 'IBMPlexSans_600SemiBold',
-                            color: canPublish ? AppColors.white : '#9CA3AF',
-                        }}>
-                            Publish
-                        </Text>
+                        {isPending ? (
+                            <ActivityIndicator size="small" color={canPublish ? AppColors.white : '#9CA3AF'} />
+                        ) : (
+                            <Text style={{
+                                fontSize: 13,
+                                fontFamily: 'IBMPlexSans_600SemiBold',
+                                color: canPublish ? AppColors.white : '#9CA3AF',
+                            }}>
+                                Publish
+                            </Text>
+                        )}
                     </Pressable>
                 </View>
 
@@ -275,7 +314,7 @@ export default function CreateArticle() {
                         </Text>
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <Pressable
-                                onPress={() => setHasImage(true)}
+                                onPress={pickImage}
                                 style={{
                                     flex: 1,
                                     height: 100,
@@ -298,14 +337,11 @@ export default function CreateArticle() {
                                 </Text>
                             </Pressable>
 
-                            {hasImage && (
+                            {hasImage && imageUri && (
                                 <View style={{ width: 100, height: 100, borderRadius: 12, backgroundColor: '#F3F4F6', overflow: 'hidden' }}>
-                                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                                        <ImageIcon />
-                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', marginTop: 4 }}>Preview</Text>
-                                    </View>
+                                    <Image source={{ uri: imageUri }} style={{ width: 100, height: 100 }} resizeMode="cover" />
                                     <Pressable
-                                        onPress={() => setHasImage(false)}
+                                        onPress={() => setImageUri(null)}
                                         style={{ position: 'absolute', top: 6, right: 6 }}
                                     >
                                         <RemoveIcon />
@@ -333,8 +369,8 @@ export default function CreateArticle() {
                             <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Cancel</Text>
                         </Pressable>
                         <Pressable
-                            onPress={() => canPublish && router.back()}
-                            disabled={!canPublish}
+                            onPress={handlePublish}
+                            disabled={!canPublish || isPending}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 backgroundColor: canPublish
@@ -346,15 +382,25 @@ export default function CreateArticle() {
                                 justifyContent: 'center',
                             })}
                         >
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'IBMPlexSans_600SemiBold',
-                                color: canPublish ? AppColors.white : '#9CA3AF',
-                            }}>
-                                {isPost ? 'Post' : 'Publish'}
-                            </Text>
+                            {isPending ? (
+                                <ActivityIndicator color={canPublish ? AppColors.white : '#9CA3AF'} />
+                            ) : (
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontFamily: 'IBMPlexSans_600SemiBold',
+                                    color: canPublish ? AppColors.white : '#9CA3AF',
+                                }}>
+                                    {isPost ? 'Post' : 'Publish'}
+                                </Text>
+                            )}
                         </Pressable>
                     </View>
+
+                    {errorMessage && (
+                        <Text selectable style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#EF4444' }}>
+                            {errorMessage}
+                        </Text>
+                    )}
                 </View>
             </ScrollView>
             <DiscardChangesModal visible={showDiscard} onCancel={() => setShowDiscard(false)} onDiscard={() => { setShowDiscard(false); router.back(); }} />

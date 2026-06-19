@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, Modal, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, Modal, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -9,6 +9,24 @@ import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
 import { TabSlideIn } from '@/components/tab-slide-in';
 import { BottomDrawer } from '@/components/bottom-drawer';
 import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, ChevronRightIcon } from '@/components/model-icons';
+import { useDashboardQuery } from '@/lib/hooks/use-dashboard-api';
+
+interface RecentActivityRow {
+    id: string;
+    title: string;
+    status: string;
+    statusColor: string;
+    statusBg: string;
+    updated: string;
+}
+
+// The dashboard API exposes overview stats and chart data only — it carries no
+// recent-activity list, so these rows are shown as a static placeholder.
+const FALLBACK_ACTIVITY: RecentActivityRow[] = [
+    { id: '#2024-0892', title: 'Digital Forgery Case', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '2h ago' },
+    { id: '#2024-0891', title: 'Identity Verification', status: 'Completed', statusColor: AppColors.success, statusBg: '#DCFCE7', updated: '5h ago' },
+    { id: '#2024-0890', title: 'Evidence Authentication', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '1d ago' },
+];
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -142,6 +160,13 @@ export default function DoctorDashboard() {
     ]);
     const unreadCount = notifications.filter(n => !n.read).length;
 
+    const dashboardQuery = useDashboardQuery();
+    const overview = dashboardQuery.data?.overview;
+    const activeCount = overview?.active_cases.total ?? 0;
+    const evidenceCount = overview?.evidences.total ?? 0;
+    const completedCount = overview?.completed_cases.total ?? 0;
+    const recentActivity: RecentActivityRow[] = FALLBACK_ACTIVITY;
+
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }} {...swipeHandlers}>
             <TabSlideIn>
@@ -228,7 +253,7 @@ export default function DoctorDashboard() {
                                         opacity: pressed ? 0.7 : 1,
                                     })}
                                 >
-                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>15</Text>
+                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>{activeCount}</Text>
                                     <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Active</Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(99,204,255,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
                                         <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
@@ -249,7 +274,7 @@ export default function DoctorDashboard() {
                                         opacity: pressed ? 0.7 : 1,
                                     })}
                                 >
-                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>120</Text>
+                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>{evidenceCount}</Text>
                                     <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Evidence</Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(251,191,36,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
                                         <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#FBBF24' }} />
@@ -268,7 +293,7 @@ export default function DoctorDashboard() {
                                         opacity: pressed ? 0.7 : 1,
                                     })}
                                 >
-                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>45</Text>
+                                    <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>{completedCount}</Text>
                                     <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Completed</Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(52,211,153,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
                                         <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
@@ -426,47 +451,49 @@ export default function DoctorDashboard() {
                             borderColor: '#E5E7EB',
                             overflow: 'hidden',
                         }}>
-                            {[
-                                { id: '#2024-0892', title: 'Digital Forgery Case', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '2h ago' },
-                                { id: '#2024-0891', title: 'Identity Verification', status: 'Completed', statusColor: AppColors.success, statusBg: '#DCFCE7', updated: '5h ago' },
-                                { id: '#2024-0890', title: 'Evidence Authentication', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '1d ago' },
-                            ].map((item, idx, arr) => (
-                                <Pressable
-                                    key={item.id}
-                                    onPress={() => router.push({
-                                        pathname: '/(doctor)/case-details' as any,
-                                        params: { id: item.id.replace('#', ''), title: item.title },
-                                    })}
-                                    style={({ pressed }) => ({
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        paddingHorizontal: 16,
-                                        paddingVertical: 14,
-                                        backgroundColor: pressed ? '#F8FAFC' : 'transparent',
-                                        borderBottomWidth: idx < arr.length - 1 ? 1 : 0,
-                                        borderBottomColor: '#F3F4F6',
-                                    })}
-                                >
-                                    <View style={{ flex: 1, gap: 2 }}>
-                                        <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                            {item.title}
-                                        </Text>
-                                        <Text style={{ ...Typography.caption, color: '#9CA3AF' }}>
-                                            {item.id} · {item.updated}
-                                        </Text>
-                                    </View>
-                                    <View style={{
-                                        backgroundColor: item.statusBg,
-                                        paddingVertical: 3,
-                                        paddingHorizontal: 8,
-                                        borderRadius: 6,
-                                    }}>
-                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: item.statusColor }}>
-                                            {item.status}
-                                        </Text>
-                                    </View>
-                                </Pressable>
-                            ))}
+                            {dashboardQuery.isPending ? (
+                                <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center' }}>
+                                    <ActivityIndicator color={AppColors.primary} />
+                                </View>
+                            ) : (
+                                recentActivity.map((item, idx, arr) => (
+                                    <Pressable
+                                        key={item.id}
+                                        onPress={() => router.push({
+                                            pathname: '/(doctor)/case-details' as any,
+                                            params: { id: item.id.replace('#', ''), title: item.title },
+                                        })}
+                                        style={({ pressed }) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            paddingHorizontal: 16,
+                                            paddingVertical: 14,
+                                            backgroundColor: pressed ? '#F8FAFC' : 'transparent',
+                                            borderBottomWidth: idx < arr.length - 1 ? 1 : 0,
+                                            borderBottomColor: '#F3F4F6',
+                                        })}
+                                    >
+                                        <View style={{ flex: 1, gap: 2 }}>
+                                            <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                                {item.title}
+                                            </Text>
+                                            <Text style={{ ...Typography.caption, color: '#9CA3AF' }}>
+                                                {item.updated ? `${item.id} · ${item.updated}` : item.id}
+                                            </Text>
+                                        </View>
+                                        <View style={{
+                                            backgroundColor: item.statusBg,
+                                            paddingVertical: 3,
+                                            paddingHorizontal: 8,
+                                            borderRadius: 6,
+                                        }}>
+                                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: item.statusColor }}>
+                                                {item.status}
+                                            </Text>
+                                        </View>
+                                    </Pressable>
+                                ))
+                            )}
                         </View>
                     </View>
                 </ScrollView>

@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, Animated, Dimensions, NativeSyntheticEvent, NativeScrollEvent, TextInput as RNTextInput, Image } from 'react-native';
+import { useState, useRef, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, Pressable, Animated, Dimensions, NativeSyntheticEvent, NativeScrollEvent, TextInput as RNTextInput, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -7,6 +7,21 @@ import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
 import { TabSlideIn } from '@/components/tab-slide-in';
 import { BottomDrawer } from '@/components/bottom-drawer';
+import {
+    useFeedQuery,
+    useToggleLikeFeedMutation,
+    useToggleLikeArticleMutation,
+    useAddCommentFeedMutation,
+    useAddCommentArticleMutation,
+    isArticleItem,
+    feedAuthorName,
+    feedAuthorSpecialty,
+    feedCommentText,
+    feedCommentAuthor,
+    timeAgo,
+    type FeedItem,
+    type FeedComment,
+} from '@/lib/hooks/use-community-api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -137,6 +152,8 @@ interface Post {
     likes: number;
     comments: number;
     timeAgo: string;
+    kind?: 'feed' | 'article';
+    serverComments?: FeedComment[];
 }
 
 const publicPosts: Post[] = [
@@ -158,6 +175,8 @@ interface Article {
     comments: number;
     timeAgo: string;
     readTime?: string;
+    kind?: 'feed' | 'article';
+    serverComments?: FeedComment[];
 }
 
 const publications: Article[] = [
@@ -172,6 +191,7 @@ const myPublications: Article[] = [
     { id: '2', author: 'Dr. Mohammed Sakr', specialty: 'Forensic Scientist', avatarColor: '#4682B4', title: 'Microbial Forensics: Utilizing Skin Microbiome for Individual Identification', content: 'Important update on DNA contamination prevention protocols. Every forensic lab should review their current procedures.', hasImage: false, likes: 234, comments: 45, timeAgo: '2h', readTime: '6 min read' },
 ];
 
+// trendingTopics stays static: the feed payload carries no topic/tag data.
 const trendingTopics = [
     { tag: '#DNA Analysis', posts: 128 },
     { tag: '#Toxicology', posts: 94 },
@@ -179,6 +199,50 @@ const trendingTopics = [
     { tag: '#Digital Forensics', posts: 63 },
     { tag: '#Cold Cases', posts: 51 },
 ];
+
+// Deterministic avatar color derived from the author name (server gives no color).
+const AVATAR_PALETTE = ['#D4A574', '#8B6F5C', '#A0522D', '#6B8E8E', '#4682B4', '#5B8C5A', '#8B5E83', '#C4A35A'];
+function avatarColorFor(seed: string): string {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    }
+    return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+}
+
+function feedItemToPost(item: FeedItem): Post {
+    const author = feedAuthorName(item);
+    return {
+        id: String(item.id),
+        author,
+        specialty: feedAuthorSpecialty(item),
+        avatarColor: avatarColorFor(author),
+        content: item.content ?? item.title ?? '',
+        likes: item.likes_count ?? 0,
+        comments: item.comments_count ?? (item.comments?.length ?? 0),
+        timeAgo: timeAgo(item.created_at),
+        kind: isArticleItem(item) ? 'article' : 'feed',
+        serverComments: item.comments,
+    };
+}
+
+function feedItemToArticle(item: FeedItem): Article {
+    const author = feedAuthorName(item);
+    return {
+        id: String(item.id),
+        author,
+        specialty: feedAuthorSpecialty(item),
+        avatarColor: avatarColorFor(author),
+        title: item.title ?? (item.content ?? '').slice(0, 80),
+        content: item.content ?? '',
+        hasImage: typeof item.image === 'string' && item.image.length > 0,
+        likes: item.likes_count ?? 0,
+        comments: item.comments_count ?? (item.comments?.length ?? 0),
+        timeAgo: timeAgo(item.created_at),
+        kind: isArticleItem(item) ? 'article' : 'feed',
+        serverComments: item.comments,
+    };
+}
 
 /* ─── Components ─── */
 function AvatarCircle({ color, size = 40, initials }: { color: string; size?: number; initials?: string }) {
@@ -303,14 +367,51 @@ export default function CommunityScreen() {
     const fabTranslateY = useRef(new Animated.Value(0)).current;
     const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    const feedQuery = useFeedQuery();
+    const toggleLikeFeed = useToggleLikeFeedMutation();
+    const toggleLikeArticle = useToggleLikeArticleMutation();
+    const addCommentFeed = useAddCommentFeedMutation();
+    const addCommentArticle = useAddCommentArticleMutation();
+
+    const feedItems = useMemo(() => feedQuery.data ?? [], [feedQuery.data]);
+    const itemById = useMemo(() => {
+        const map = new Map<string, FeedItem>();
+        for (const item of feedItems) map.set(String(item.id), item);
+        return map;
+    }, [feedItems]);
+
+    // The server feed is one list; derive the three tabs from it. Posts =
+    // non-article items, Publications = article items, My Posts = same articles
+    // (the backend has no per-user filter exposed here — verify on first 200).
+    const livePosts = useMemo<Post[]>(
+        () => feedItems.filter(i => !isArticleItem(i)).map(feedItemToPost),
+        [feedItems],
+    );
+    const liveArticles = useMemo<Article[]>(
+        () => feedItems.filter(isArticleItem).map(feedItemToArticle),
+        [feedItems],
+    );
+
+    const hasData = feedItems.length > 0;
+    const feedPosts: Post[] = hasData ? (livePosts.length > 0 ? livePosts : feedItems.map(feedItemToPost)) : publicPosts;
+    const feedPublications: Article[] = hasData ? (liveArticles.length > 0 ? liveArticles : feedItems.map(feedItemToArticle)) : publications;
+    const feedMyPosts: Article[] = hasData ? feedPublications : myPublications;
+
     // Interactive state
     const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
     const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
-    const [commentsDrawer, setCommentsDrawer] = useState<{ visible: boolean; postId: string; title: string }>({ visible: false, postId: '', title: '' });
+    const [commentsDrawer, setCommentsDrawer] = useState<{ visible: boolean; postId: string; title: string; kind: 'feed' | 'article' }>({ visible: false, postId: '', title: '', kind: 'feed' });
     const [newComment, setNewComment] = useState('');
-    const [viewPost, setViewPost] = useState<(typeof publicPosts)[number] | null>(null);
-    const [viewArticle, setViewArticle] = useState<(typeof publications)[number] | null>(null);
+    const [viewPost, setViewPost] = useState<Post | null>(null);
+    const [viewArticle, setViewArticle] = useState<Article | null>(null);
     const [showInlineComments, setShowInlineComments] = useState(false);
+
+    const likeItem = useCallback((id: string, kind: 'feed' | 'article' | undefined) => {
+        const resolved = kind ?? (itemById.get(id) && isArticleItem(itemById.get(id) as FeedItem) ? 'article' : 'feed');
+        if (itemById.has(id)) {
+            if (resolved === 'article') toggleLikeArticle.mutate(id); else toggleLikeFeed.mutate(id);
+        }
+    }, [itemById, toggleLikeArticle, toggleLikeFeed]);
 
     const toggleLike = useCallback((id: string) => {
         setLikedPosts(prev => {
@@ -319,6 +420,17 @@ export default function CommunityScreen() {
             return next;
         });
     }, []);
+
+    const submitComment = useCallback((id: string, kind: 'feed' | 'article') => {
+        const text = newComment.trim();
+        if (!text || !itemById.has(id)) return;
+        const onSuccess = () => setNewComment('');
+        if (kind === 'article') {
+            addCommentArticle.mutate({ id, comment: text }, { onSuccess });
+        } else {
+            addCommentFeed.mutate({ id, comment: text }, { onSuccess });
+        }
+    }, [newComment, itemById, addCommentArticle, addCommentFeed]);
 
     const toggleBookmark = useCallback((id: string) => {
         setBookmarkedPosts(prev => {
@@ -478,7 +590,27 @@ export default function CommunityScreen() {
 
                         {/* Posts */}
                         <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>
-                            {publicPosts.map((post) => (
+                            {feedQuery.isLoading && (
+                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                    <ActivityIndicator color={AppColors.primary} />
+                                </View>
+                            )}
+                            {feedQuery.isError && !feedQuery.isLoading && (
+                                <View style={{ paddingVertical: 24, alignItems: 'center', gap: 10 }}>
+                                    <Text selectable style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#EF4444', textAlign: 'center' }}>
+                                        Couldn&apos;t load the feed. {feedQuery.error instanceof Error ? feedQuery.error.message : ''}
+                                    </Text>
+                                    <Pressable onPress={() => feedQuery.refetch()} style={{ backgroundColor: AppColors.primary, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 8 }}>
+                                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Retry</Text>
+                                    </Pressable>
+                                </View>
+                            )}
+                            {!feedQuery.isLoading && !feedQuery.isError && feedPosts.length === 0 && (
+                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>No posts yet.</Text>
+                                </View>
+                            )}
+                            {feedPosts.map((post) => (
                                 <Pressable
                                     key={post.id}
                                     onPress={() => setViewPost(post)}
@@ -512,9 +644,9 @@ export default function CommunityScreen() {
                                         timeAgo={post.timeAgo}
                                         liked={likedPosts.has('feed-' + post.id)}
                                         bookmarked={bookmarkedPosts.has('feed-' + post.id)}
-                                        onLike={() => toggleLike('feed-' + post.id)}
+                                        onLike={() => { toggleLike('feed-' + post.id); likeItem(post.id, post.kind); }}
                                         onBookmark={() => toggleBookmark('feed-' + post.id)}
-                                        onComment={() => setCommentsDrawer({ visible: true, postId: post.id, title: post.author })}
+                                        onComment={() => setCommentsDrawer({ visible: true, postId: post.id, title: post.author, kind: post.kind ?? 'feed' })}
                                     />
                                 </Pressable>
                             ))}
@@ -531,7 +663,12 @@ export default function CommunityScreen() {
                         scrollEventThrottle={16}
                     >
                         <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 10 }}>
-                            {publications.map((article) => (
+                            {!feedQuery.isLoading && !feedQuery.isError && feedPublications.length === 0 && (
+                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>No publications yet.</Text>
+                                </View>
+                            )}
+                            {feedPublications.map((article) => (
                                 <Pressable
                                     key={article.id}
                                     onPress={() => setViewArticle(article)}
@@ -582,9 +719,9 @@ export default function CommunityScreen() {
                                         timeAgo={article.timeAgo}
                                         liked={likedPosts.has('pub-' + article.id)}
                                         bookmarked={bookmarkedPosts.has('pub-' + article.id)}
-                                        onLike={() => toggleLike('pub-' + article.id)}
+                                        onLike={() => { toggleLike('pub-' + article.id); likeItem(article.id, article.kind); }}
                                         onBookmark={() => toggleBookmark('pub-' + article.id)}
-                                        onComment={() => setCommentsDrawer({ visible: true, postId: article.id, title: article.title })}
+                                        onComment={() => setCommentsDrawer({ visible: true, postId: article.id, title: article.title, kind: article.kind ?? 'article' })}
                                     />
                                 </Pressable>
                             ))}
@@ -601,7 +738,12 @@ export default function CommunityScreen() {
                         scrollEventThrottle={16}
                     >
                         <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 10 }}>
-                            {myPublications.map((article) => (
+                            {!feedQuery.isLoading && !feedQuery.isError && feedMyPosts.length === 0 && (
+                                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>No posts yet.</Text>
+                                </View>
+                            )}
+                            {feedMyPosts.map((article) => (
                                 <Pressable
                                     key={article.id}
                                     onPress={() => setViewArticle(article)}
@@ -648,9 +790,9 @@ export default function CommunityScreen() {
                                         showEdit
                                         liked={likedPosts.has('my-' + article.id)}
                                         bookmarked={bookmarkedPosts.has('my-' + article.id)}
-                                        onLike={() => toggleLike('my-' + article.id)}
+                                        onLike={() => { toggleLike('my-' + article.id); likeItem(article.id, article.kind); }}
                                         onBookmark={() => toggleBookmark('my-' + article.id)}
-                                        onComment={() => setCommentsDrawer({ visible: true, postId: article.id, title: article.title })}
+                                        onComment={() => setCommentsDrawer({ visible: true, postId: article.id, title: article.title, kind: article.kind ?? 'article' })}
                                     />
                                 </Pressable>
                             ))}
@@ -694,25 +836,45 @@ export default function CommunityScreen() {
             {/* Comments Drawer */}
             <BottomDrawer
                 visible={commentsDrawer.visible}
-                onClose={() => { setCommentsDrawer({ visible: false, postId: '', title: '' }); setNewComment(''); }}
+                onClose={() => { setCommentsDrawer({ visible: false, postId: '', title: '', kind: 'feed' }); setNewComment(''); }}
                 title="Comments"
                 subtitle={commentsDrawer.title}
                 height={480}
             >
                 <View style={{ flex: 1 }}>
                     {/* Comment list */}
-                    {(mockComments.default).map((c) => (
-                        <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                            <AvatarCircle color={c.avatarColor} size={32} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
-                            <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
-                                    <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
+                    {(() => {
+                        const server = itemById.get(commentsDrawer.postId)?.comments ?? [];
+                        if (server.length > 0) {
+                            return server.map((c, i) => {
+                                const author = feedCommentAuthor(c);
+                                return (
+                                    <View key={String(c.id ?? i)} style={{ flexDirection: 'row', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                                        <AvatarCircle color={avatarColorFor(author)} size={32} initials={author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{author}</Text>
+                                                <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{timeAgo(c.created_at)}</Text>
+                                            </View>
+                                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 19, marginTop: 3 }}>{feedCommentText(c)}</Text>
+                                        </View>
+                                    </View>
+                                );
+                            });
+                        }
+                        return mockComments.default.map((c) => (
+                            <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                                <AvatarCircle color={c.avatarColor} size={32} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
+                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 19, marginTop: 3 }}>{c.text}</Text>
                                 </View>
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 19, marginTop: 3 }}>{c.text}</Text>
                             </View>
-                        </View>
-                    ))}
+                        ));
+                    })()}
 
                     {/* Comment input */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6' }}>
@@ -732,11 +894,13 @@ export default function CommunityScreen() {
                                 placeholderTextColor="#9CA3AF"
                                 value={newComment}
                                 onChangeText={setNewComment}
+                                editable={!addCommentFeed.isPending && !addCommentArticle.isPending}
                                 style={{ flex: 1, fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}
                             />
                         </View>
                         <Pressable
-                            onPress={() => newComment.trim() && setNewComment('')}
+                            onPress={() => submitComment(commentsDrawer.postId, commentsDrawer.kind)}
+                            disabled={!newComment.trim() || addCommentFeed.isPending || addCommentArticle.isPending}
                             style={{
                                 width: 42,
                                 height: 42,
@@ -746,7 +910,9 @@ export default function CommunityScreen() {
                                 justifyContent: 'center',
                             }}
                         >
-                            <SendIcon />
+                            {(addCommentFeed.isPending || addCommentArticle.isPending)
+                                ? <ActivityIndicator size="small" color={AppColors.white} />
+                                : <SendIcon />}
                         </Pressable>
                     </View>
                 </View>
@@ -778,7 +944,7 @@ export default function CommunityScreen() {
                         {/* Stats */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6' }}>
                             <Pressable
-                                onPress={() => toggleLike('feed-' + viewPost.id)}
+                                onPress={() => { toggleLike('feed-' + viewPost.id); likeItem(viewPost.id, viewPost.kind); }}
                                 style={({ pressed }) => ({
                                     flexDirection: 'row', alignItems: 'center', gap: 5,
                                     backgroundColor: likedPosts.has('feed-' + viewPost.id) ? '#FEF2F2' : (pressed ? '#F9FAFB' : 'transparent'),
@@ -815,18 +981,35 @@ export default function CommunityScreen() {
                         {showInlineComments && (
                             <View style={{ marginTop: 14 }}>
                                 <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary, marginBottom: 10 }}>Comments</Text>
-                                {mockComments.default.map((c) => (
-                                    <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                                        <AvatarCircle color={c.avatarColor} size={28} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
-                                        <View style={{ flex: 1 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
-                                                <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
+                                {(viewPost.serverComments && viewPost.serverComments.length > 0
+                                    ? viewPost.serverComments.map((c, i) => {
+                                        const author = feedCommentAuthor(c);
+                                        return (
+                                            <View key={String(c.id ?? i)} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                                                <AvatarCircle color={avatarColorFor(author)} size={28} initials={author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
+                                                <View style={{ flex: 1 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{author}</Text>
+                                                        <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{timeAgo(c.created_at)}</Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{feedCommentText(c)}</Text>
+                                                </View>
                                             </View>
-                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{c.text}</Text>
+                                        );
+                                    })
+                                    : mockComments.default.map((c) => (
+                                        <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                                            <AvatarCircle color={c.avatarColor} size={28} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
+                                            <View style={{ flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
+                                                    <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
+                                                </View>
+                                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{c.text}</Text>
+                                            </View>
                                         </View>
-                                    </View>
-                                ))}
+                                    ))
+                                )}
                                 {/* Comment input */}
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
                                     <View style={{ flex: 1, backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, height: 38, justifyContent: 'center' }}>
@@ -835,14 +1018,16 @@ export default function CommunityScreen() {
                                             placeholderTextColor="#9CA3AF"
                                             value={newComment}
                                             onChangeText={setNewComment}
+                                            editable={!addCommentFeed.isPending && !addCommentArticle.isPending}
                                             style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}
                                         />
                                     </View>
                                     <Pressable
-                                        onPress={() => newComment.trim() && setNewComment('')}
+                                        onPress={() => submitComment(viewPost.id, viewPost.kind ?? 'feed')}
+                                        disabled={!newComment.trim() || addCommentFeed.isPending || addCommentArticle.isPending}
                                         style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: newComment.trim() ? AppColors.primary : '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}
                                     >
-                                        <SendIcon />
+                                        {(addCommentFeed.isPending || addCommentArticle.isPending) ? <ActivityIndicator size="small" color={AppColors.white} /> : <SendIcon />}
                                     </Pressable>
                                 </View>
                             </View>
@@ -893,7 +1078,7 @@ export default function CommunityScreen() {
                         {/* Stats */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6' }}>
                             <Pressable
-                                onPress={() => toggleLike('pub-' + viewArticle.id)}
+                                onPress={() => { toggleLike('pub-' + viewArticle.id); likeItem(viewArticle.id, viewArticle.kind); }}
                                 style={({ pressed }) => ({
                                     flexDirection: 'row', alignItems: 'center', gap: 5,
                                     backgroundColor: likedPosts.has('pub-' + viewArticle.id) ? '#FEF2F2' : (pressed ? '#F9FAFB' : 'transparent'),
@@ -930,18 +1115,35 @@ export default function CommunityScreen() {
                         {showInlineComments && (
                             <View style={{ marginTop: 14 }}>
                                 <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary, marginBottom: 10 }}>Comments</Text>
-                                {mockComments.default.map((c) => (
-                                    <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                                        <AvatarCircle color={c.avatarColor} size={28} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
-                                        <View style={{ flex: 1 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
-                                                <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
+                                {(viewArticle.serverComments && viewArticle.serverComments.length > 0
+                                    ? viewArticle.serverComments.map((c, i) => {
+                                        const author = feedCommentAuthor(c);
+                                        return (
+                                            <View key={String(c.id ?? i)} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                                                <AvatarCircle color={avatarColorFor(author)} size={28} initials={author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
+                                                <View style={{ flex: 1 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{author}</Text>
+                                                        <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{timeAgo(c.created_at)}</Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{feedCommentText(c)}</Text>
+                                                </View>
                                             </View>
-                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{c.text}</Text>
+                                        );
+                                    })
+                                    : mockComments.default.map((c) => (
+                                        <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                                            <AvatarCircle color={c.avatarColor} size={28} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
+                                            <View style={{ flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
+                                                    <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
+                                                </View>
+                                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{c.text}</Text>
+                                            </View>
                                         </View>
-                                    </View>
-                                ))}
+                                    ))
+                                )}
                                 {/* Comment input */}
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
                                     <View style={{ flex: 1, backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, height: 38, justifyContent: 'center' }}>
@@ -950,14 +1152,16 @@ export default function CommunityScreen() {
                                             placeholderTextColor="#9CA3AF"
                                             value={newComment}
                                             onChangeText={setNewComment}
+                                            editable={!addCommentFeed.isPending && !addCommentArticle.isPending}
                                             style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}
                                         />
                                     </View>
                                     <Pressable
-                                        onPress={() => newComment.trim() && setNewComment('')}
+                                        onPress={() => submitComment(viewArticle.id, viewArticle.kind ?? 'article')}
+                                        disabled={!newComment.trim() || addCommentFeed.isPending || addCommentArticle.isPending}
                                         style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: newComment.trim() ? AppColors.primary : '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}
                                     >
-                                        <SendIcon />
+                                        {(addCommentFeed.isPending || addCommentArticle.isPending) ? <ActivityIndicator size="small" color={AppColors.white} /> : <SendIcon />}
                                     </Pressable>
                                 </View>
                             </View>
