@@ -156,13 +156,6 @@ interface Post {
     serverComments?: FeedComment[];
 }
 
-const publicPosts: Post[] = [
-    { id: '1', author: 'Dr. Sarah Chen', specialty: 'Forensic Pathologist', avatarColor: '#D4A574', content: 'New research on post-mortem interval estimation using entomology. Our team has successfully reduced the margin of error by 15% using advanced microscopy techniques.', likes: 234, comments: 45, timeAgo: '2h' },
-    { id: '2', author: 'Prof. Lili Ross', specialty: 'DNA Analysis Expert', avatarColor: '#8B6F5C', content: 'Important update on DNA contamination prevention protocols. Every forensic lab should review their current procedures.', likes: 189, comments: 32, timeAgo: '5h' },
-    { id: '3', author: 'Dr. Emily Watson', specialty: 'Toxicology Specialist', avatarColor: '#A0522D', content: 'Sharing a comprehensive guide on detecting novel synthetic opioids in biological samples. Link to full paper in comments.', likes: 156, comments: 28, timeAgo: '1d' },
-    { id: '4', author: 'Dr. James Miller', specialty: 'Crime Scene Investigator', avatarColor: '#6B8E8E', content: 'Case study: How we solved a 10-year-old cold case using advanced digital forensics and DNA phenotyping.', likes: 298, comments: 67, timeAgo: '2d' },
-];
-
 interface Article {
     id: string;
     author: string;
@@ -178,18 +171,6 @@ interface Article {
     kind?: 'feed' | 'article';
     serverComments?: FeedComment[];
 }
-
-const publications: Article[] = [
-    { id: '1', author: 'Dr. James Miller', specialty: 'Crime Scene Investigator', avatarColor: '#6B8E8E', title: 'Next-Gen Sequencing (NGS): Advancements in Fragmented DNA Recovery.', content: 'New research on post-mortem interval estimation using entomology. Our team has successfully reduced the margin of error by 15% using advanced microscopy techniques.', hasImage: true, likes: 234, comments: 45, timeAgo: '2h', readTime: '8 min read' },
-    { id: '2', author: 'Dr. James Miller', specialty: 'Crime Scene Investigator', avatarColor: '#6B8E8E', title: 'Microbial Forensics: Utilizing Skin Microbiome for Individual Identification', content: 'New research on post-mortem interval estimation using entomology. Our team has successfully reduced the margin of error by 15% using advanced microscopy techniques.', hasImage: false, likes: 189, comments: 32, timeAgo: '5h', readTime: '5 min read' },
-    { id: '3', author: 'Dr. James Miller', specialty: 'Crime Scene Investigator', avatarColor: '#6B8E8E', title: 'Epigenetic Clock: Estimating Chronological Age from Biological Samples.', content: 'Sharing a comprehensive guide on detecting novel synthetic opioids in biological samples. Link to full paper in comments.', hasImage: false, likes: 156, comments: 28, timeAgo: '1d', readTime: '12 min read' },
-    { id: '4', author: 'Dr. James Miller', specialty: 'Crime Scene Investigator', avatarColor: '#6B8E8E', title: 'Advanced Serology: Differentiating Menstrual vs. Peripheral Blood in Crime Scenes.', content: 'Case study: How we solved a 10-year-old cold case using advanced digital forensics and DNA phenotyping.', hasImage: true, likes: 298, comments: 67, timeAgo: '2d', readTime: '10 min read' },
-];
-
-const myPublications: Article[] = [
-    { id: '1', author: 'Dr. Mohammed Sakr', specialty: 'Forensic Scientist', avatarColor: '#4682B4', title: 'Toxicological Anomalies: Identifying Rare Synthetic Opioids in Post-Mortem Samples.', content: 'New research on post-mortem interval estimation using entomology. Our team has successfully reduced the margin of error by 15% using advanced microscopy techniques.', hasImage: true, likes: 234, comments: 45, timeAgo: '2h', readTime: '7 min read' },
-    { id: '2', author: 'Dr. Mohammed Sakr', specialty: 'Forensic Scientist', avatarColor: '#4682B4', title: 'Microbial Forensics: Utilizing Skin Microbiome for Individual Identification', content: 'Important update on DNA contamination prevention protocols. Every forensic lab should review their current procedures.', hasImage: false, likes: 234, comments: 45, timeAgo: '2h', readTime: '6 min read' },
-];
 
 // trendingTopics stays static: the feed payload carries no topic/tag data.
 const trendingTopics = [
@@ -347,16 +328,6 @@ function SendIcon() {
     );
 }
 
-/* ─── Mock comments ─── */
-const mockComments: Record<string, { id: string; author: string; avatarColor: string; text: string; timeAgo: string }[]> = {
-    default: [
-        { id: 'c1', author: 'Dr. Alan Reed', avatarColor: '#5B8C5A', text: 'Fascinating findings! Could you share the dataset size used in the study?', timeAgo: '1h' },
-        { id: 'c2', author: 'Prof. Maria Gonzales', avatarColor: '#8B5E83', text: 'We\'ve seen similar results in our lab. Would love to collaborate.', timeAgo: '3h' },
-        { id: 'c3', author: 'Dr. Tom Nguyen', avatarColor: '#C4A35A', text: 'This aligns well with the 2023 AAFS paper on the same topic.', timeAgo: '5h' },
-    ],
-};
-
-/* ─── Main ─── */
 export default function CommunityScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -392,10 +363,9 @@ export default function CommunityScreen() {
         [feedItems],
     );
 
-    const hasData = feedItems.length > 0;
-    const feedPosts: Post[] = hasData ? (livePosts.length > 0 ? livePosts : feedItems.map(feedItemToPost)) : publicPosts;
-    const feedPublications: Article[] = hasData ? (liveArticles.length > 0 ? liveArticles : feedItems.map(feedItemToArticle)) : publications;
-    const feedMyPosts: Article[] = hasData ? feedPublications : myPublications;
+    const feedPosts: Post[] = livePosts;
+    const feedPublications: Article[] = liveArticles;
+    const feedMyPosts: Article[] = liveArticles;
 
     // Interactive state
     const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
@@ -862,18 +832,12 @@ export default function CommunityScreen() {
                                 );
                             });
                         }
-                        return mockComments.default.map((c) => (
-                            <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                                <AvatarCircle color={c.avatarColor} size={32} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
-                                <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
-                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
-                                    </View>
-                                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 19, marginTop: 3 }}>{c.text}</Text>
-                                </View>
+                        return (
+                            <View style={{ alignItems: 'center', paddingVertical: 28, gap: 4 }}>
+                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>No comments yet</Text>
+                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>Be the first to comment</Text>
                             </View>
-                        ));
+                        );
                     })()}
 
                     {/* Comment input */}
@@ -997,18 +961,12 @@ export default function CommunityScreen() {
                                             </View>
                                         );
                                     })
-                                    : mockComments.default.map((c) => (
-                                        <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                                            <AvatarCircle color={c.avatarColor} size={28} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
-                                            <View style={{ flex: 1 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
-                                                    <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
-                                                </View>
-                                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{c.text}</Text>
-                                            </View>
+                                    : (
+                                        <View style={{ alignItems: 'center', paddingVertical: 24, gap: 4 }}>
+                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>No comments yet</Text>
+                                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>Be the first to comment</Text>
                                         </View>
-                                    ))
+                                    )
                                 )}
                                 {/* Comment input */}
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
@@ -1131,18 +1089,12 @@ export default function CommunityScreen() {
                                             </View>
                                         );
                                     })
-                                    : mockComments.default.map((c) => (
-                                        <View key={c.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                                            <AvatarCircle color={c.avatarColor} size={28} initials={c.author.split(' ').map(w => w[0]).slice(0, 2).join('')} />
-                                            <View style={{ flex: 1 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{c.author}</Text>
-                                                    <Text style={{ fontSize: 9, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>{c.timeAgo}</Text>
-                                                </View>
-                                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', lineHeight: 18, marginTop: 2 }}>{c.text}</Text>
-                                            </View>
+                                    : (
+                                        <View style={{ alignItems: 'center', paddingVertical: 24, gap: 4 }}>
+                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>No comments yet</Text>
+                                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>Be the first to comment</Text>
                                         </View>
-                                    ))
+                                    )
                                 )}
                                 {/* Comment input */}
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
