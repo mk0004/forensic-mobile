@@ -98,6 +98,7 @@ const TRAIT_LABELS: Record<string, string> = {
     freckling: 'Freckling',
     freckles: 'Freckling',
     iris_color: 'Eye Color',
+    skin_color: 'Skin Color',
     height: 'Height',
 };
 
@@ -121,10 +122,20 @@ function normalizeConfidence(value: unknown) {
     return value <= 1 ? value * 100 : value;
 }
 
+function getTopProbability(value: any) {
+    if (!value || typeof value !== 'object') return null;
+    const top = Object.entries(value)
+        .filter(([, score]) => typeof score === 'number')
+        .sort((a, b) => (b[1] as number) - (a[1] as number))[0];
+
+    return top ? { label: top[0], confidence: normalizeConfidence(top[1]) } : null;
+}
+
 function normalizePrediction(item: any, fallbackTrait = 'Unknown'): PhenotypePrediction {
     const trait = item?.trait || item?.phenotype || item?.characteristic || item?.name || fallbackTrait;
-    const rawValue = item?.value ?? item?.prediction ?? item?.result ?? item?.label ?? item?.call ?? 'Unknown';
-    const confidence = normalizeConfidence(item?.confidence ?? item?.probability ?? item?.score);
+    const topProbability = getTopProbability(item);
+    const rawValue = item?.value ?? item?.prediction ?? item?.result ?? item?.label ?? item?.call ?? topProbability?.label ?? 'Unknown';
+    const confidence = normalizeConfidence(item?.confidence ?? item?.probability ?? item?.score) ?? topProbability?.confidence ?? null;
 
     return {
         trait: formatTraitName(String(trait)),

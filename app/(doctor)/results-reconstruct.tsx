@@ -73,11 +73,14 @@ export default function ResultsReconstructScreen() {
         try {
             const raw = JSON.parse(apiData || '{}');
             const restoredImage = raw.restored_image || raw.restored_image_base64 || raw.enhanced_image || raw.enhanced_image_base64 || raw.image || raw.image_base64 || null;
-            const analysisSource = raw.analysis || raw.result || raw.deepface_analysis || raw.face_analysis || raw || {};
+            const firstFace = Array.isArray(raw.faces) ? raw.faces[0] : null;
+            const analysisSource = raw.analysis || raw.result || raw.deepface_analysis || raw.face_analysis || firstFace || raw || {};
             const analysis = Array.isArray(analysisSource) ? analysisSource[0] || {} : analysisSource;
             
-            const age = analysis.age ?? analysis.Age ?? raw.age ?? raw.Age ?? null;
-            const gender = analysis.gender ?? analysis.Gender ?? raw.gender ?? raw.Gender ?? null;
+            const ageInfo = analysis.age_info || raw.age_info || {};
+            const genderInfo = analysis.gender_info || raw.gender_info || {};
+            const age = ageInfo.age_range ?? ageInfo.age_avg ?? analysis.age ?? analysis.Age ?? raw.age ?? raw.Age ?? null;
+            const gender = genderInfo.gender ?? analysis.gender ?? analysis.Gender ?? raw.gender ?? raw.Gender ?? null;
             const dominantGender = analysis.dominant_gender ?? analysis.dominantGender ?? raw.dominant_gender ?? null;
             const race = analysis.race ?? analysis.Race ?? raw.race ?? raw.Race ?? null;
             const dominantRace = analysis.dominant_race ?? analysis.dominantRace ?? raw.dominant_race ?? null;

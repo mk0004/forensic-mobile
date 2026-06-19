@@ -19,7 +19,7 @@ function normalizePercent(value: unknown) {
 
 function getIdentityName(value: any) {
     if (typeof value === 'string') return value;
-    return value?.identity || value?.name || value?.person || value?.label || value?.match || 'Unknown';
+    return value?.person_name || value?.identity || value?.name || value?.person || value?.label || value?.match || 'Unknown';
 }
 
 function getIdentityConfidence(value: any) {
@@ -346,10 +346,10 @@ export default function ResultsFaceRecognitionScreen() {
                                                     {match.name}
                                                 </Text>
                                                 <Text style={{ ...Typography.caption, color: '#6B7280', marginTop: 2 }}>
-                                                    {match.confidence !== null
-                                                        ? `${match.confidence.toFixed(1)}% confidence`
-                                                        : match.distance !== null
-                                                            ? `Distance: ${match.distance.toFixed(4)}`
+                                                    {match.distance !== null
+                                                        ? `Distance: ${match.distance.toFixed(4)}`
+                                                        : match.confidence !== null
+                                                            ? `${match.confidence.toFixed(1)}% confidence`
                                                             : 'Model: ArcFace - Backend: RetinaFace'}
                                                 </Text>
                                             </View>

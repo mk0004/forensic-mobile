@@ -101,7 +101,10 @@ function normalizePercent(value: unknown) {
 
 function normalizeRealFlag(face: any) {
     if (typeof face?.is_real === 'boolean') return face.is_real;
+    if (typeof face?.is_fake === 'boolean') return !face.is_fake;
     if (typeof face?.real === 'boolean') return face.real;
+    if (typeof face?.is_ai_generated === 'boolean') return !face.is_ai_generated;
+    if (typeof face?.is_spoofed === 'boolean') return !face.is_spoofed;
     const label = String(face?.label ?? face?.prediction ?? face?.verdict ?? '').toLowerCase();
     if (label.includes('real') || label.includes('authentic') || label.includes('live')) return true;
     if (label.includes('fake') || label.includes('spoof') || label.includes('generated')) return false;
@@ -135,15 +138,33 @@ export default function ResultsDeepfakeScreen() {
         try {
             const raw = JSON.parse(apiData || '{}');
             const rawFaces = raw.faces || raw.results || raw.detections || (
-                raw.is_real !== undefined || raw.prediction || raw.verdict ? [raw] : []
+                raw.is_real !== undefined || raw.is_fake !== undefined || raw.prediction || raw.verdict ? [raw] : []
             );
 
             const faces = rawFaces.map((f: any, idx: number) => {
                 const isReal = normalizeRealFlag(f);
-                const score = f.score ?? f.antispoof_score ?? f.probability ?? f.confidence ?? null;
-                const confidence = normalizePercent(f.confidence ?? f.probability ?? f.score) ?? (isReal ? 85 : 75);
+                const spoofScore = f.spoof_score ?? f.antispoof_score ?? null;
+                const aiScore = f.ai_score ?? f.generated_score ?? null;
+                const score = f.score ?? aiScore ?? spoofScore ?? f.probability ?? f.confidence ?? null;
+                const strongestSignal = Math.max(
+                    typeof spoofScore === 'number' ? spoofScore : 0,
+                    typeof aiScore === 'number' ? aiScore : 0,
+                    typeof f.score === 'number' ? f.score : 0
+                );
+                const confidence = normalizePercent(f.confidence ?? f.probability ?? strongestSignal) ?? (isReal ? 85 : 75);
                 const faceRegion = f.facial_area || f.face_region || null;
-                return { isReal, score, confidence, faceRegion, raw: f, index: idx };
+                return {
+                    isReal,
+                    score,
+                    spoofScore,
+                    aiScore,
+                    isSpoofed: f.is_spoofed,
+                    isAiGenerated: f.is_ai_generated,
+                    confidence,
+                    faceRegion,
+                    raw: f,
+                    index: idx,
+                };
             });
 
             const allReal = faces.length > 0 && faces.every((f: any) => f.isReal);
@@ -467,11 +488,27 @@ export default function ResultsDeepfakeScreen() {
                                             borderBottomWidth: 1,
                                             borderBottomColor: '#F3F4F6',
                                         }}>
-                                            <Text style={{ ...Typography.bodySmall, color: '#6B7280' }}>
-                                                Antispoof Score
+                                                <Text style={{ ...Typography.bodySmall, color: '#6B7280' }}>
+                                                AI Generation Score
                                             </Text>
                                             <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
-                                                {typeof face.score === 'number' ? face.score.toFixed(4) : 'N/A'}
+                                                {typeof face.aiScore === 'number' ? face.aiScore.toFixed(4) : 'N/A'}
+                                            </Text>
+                                        </View>
+
+                                        <View style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            paddingVertical: 10,
+                                            borderBottomWidth: 1,
+                                            borderBottomColor: '#F3F4F6',
+                                        }}>
+                                            <Text style={{ ...Typography.bodySmall, color: '#6B7280' }}>
+                                                Spoof Score
+                                            </Text>
+                                            <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                                {typeof face.spoofScore === 'number' ? face.spoofScore.toFixed(4) : 'N/A'}
                                             </Text>
                                         </View>
 
