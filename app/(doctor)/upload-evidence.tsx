@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 import { BottomDrawer } from '@/components/bottom-drawer';
@@ -90,6 +92,14 @@ interface UploadedFile {
     name: string;
     size: string;
     type: string;
+    uri: string;
+}
+
+function formatBytes(bytes?: number) {
+    if (!bytes || bytes <= 0) return '';
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1) return `${mb.toFixed(1)} MB`;
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 export default function UploadEvidence() {
@@ -106,10 +116,7 @@ export default function UploadEvidence() {
     const [selectedModelKey, setSelectedModelKey] = useState<string>('');
     const [caseDropdownOpen, setCaseDropdownOpen] = useState(false);
     const [modelDrawerOpen, setModelDrawerOpen] = useState(false);
-    const [files, setFiles] = useState<UploadedFile[]>([
-        { id: '1', name: 'evidence_photo_01.jpg', size: '2.4 MB', type: 'image' },
-        { id: '2', name: 'audio_recording.mp3', size: '5.1 MB', type: 'audio' },
-    ]);
+    const [files, setFiles] = useState<UploadedFile[]>([]);
     const [showDiscard, setShowDiscard] = useState(false);
     const [successDrawerVisible, setSuccessDrawerVisible] = useState(false);
 
@@ -125,24 +132,35 @@ export default function UploadEvidence() {
         setFiles((prev) => prev.filter((f) => f.id !== id));
     };
 
-    const addMockFile = () => {
-        const newFile: UploadedFile = {
+    const pickDocument = async () => {
+        const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+        if (result.canceled || !result.assets[0]) return;
+        const asset = result.assets[0];
+        setFiles((prev) => [...prev, {
             id: Date.now().toString(),
-            name: `evidence_${files.length + 1}.pdf`,
-            size: '1.2 MB',
-            type: 'document',
-        };
-        setFiles((prev) => [...prev, newFile]);
+            name: asset.name,
+            size: formatBytes(asset.size),
+            type: asset.mimeType?.split('/')[0] || 'document',
+            uri: asset.uri,
+        }]);
     };
 
-    const addCapturedFile = () => {
-        const newFile: UploadedFile = {
+    const capturePhoto = async () => {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+            Alert.alert('Permission needed', 'Camera access is required to capture photos.');
+            return;
+        }
+        const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+        if (result.canceled || !result.assets[0]) return;
+        const asset = result.assets[0];
+        setFiles((prev) => [...prev, {
             id: Date.now().toString(),
-            name: `capture_${files.length + 1}.jpg`,
-            size: '3.8 MB',
+            name: asset.fileName || `capture_${Date.now()}.jpg`,
+            size: formatBytes(asset.fileSize),
             type: 'image',
-        };
-        setFiles((prev) => [...prev, newFile]);
+            uri: asset.uri,
+        }]);
     };
 
     const handleSubmit = () => {
@@ -202,7 +220,7 @@ export default function UploadEvidence() {
                     {/* Upload Methods - two cards side by side */}
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                         <Pressable
-                            onPress={addMockFile}
+                            onPress={pickDocument}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
@@ -227,7 +245,7 @@ export default function UploadEvidence() {
                         </Pressable>
 
                         <Pressable
-                            onPress={addCapturedFile}
+                            onPress={capturePhoto}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
@@ -253,6 +271,16 @@ export default function UploadEvidence() {
                     </View>
 
                     {/* Uploaded Files */}
+                    {files.length === 0 && (
+                        <View style={{ alignItems: 'center', paddingVertical: 24, gap: 4 }}>
+                            <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>
+                                No files added yet
+                            </Text>
+                            <Text style={{ ...Typography.caption, color: '#D1D5DB', textAlign: 'center' }}>
+                                Upload or capture evidence to attach to this case
+                            </Text>
+                        </View>
+                    )}
                     {files.length > 0 && (
                         <View style={{ backgroundColor: AppColors.white, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 14, gap: 10 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
