@@ -9,16 +9,20 @@ import {
     useWindowDimensions,
     TextInput as RNTextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { Button } from '@/components/ui/button';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
+import { useVerifyCodeMutation, useForgotPasswordMutation } from '@/lib/hooks/use-auth-api';
 
 const CODE_LENGTH = 6;
 
 export default function VerificationCodeScreen() {
     const router = useRouter();
     const { height } = useWindowDimensions();
+    const { email } = useLocalSearchParams<{ email: string }>();
+    const verifyCodeMutation = useVerifyCodeMutation();
+    const resendMutation = useForgotPasswordMutation();
     const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''));
     const inputRefs = useRef<(RNTextInput | null)[]>([]);
 
@@ -47,7 +51,20 @@ export default function VerificationCodeScreen() {
 
     const handleContinue = () => {
         if (!allFilled) return;
-        router.push('/(auth)/new-password');
+        const otp = code.join('');
+        verifyCodeMutation.mutate(
+            { email, otp },
+            {
+                onSuccess: () => {
+                    router.push({ pathname: '/(auth)/new-password', params: { email, otp } });
+                },
+            },
+        );
+    };
+
+    const handleResend = () => {
+        if (!email) return;
+        resendMutation.mutate({ email });
     };
 
     return (
@@ -111,7 +128,7 @@ export default function VerificationCodeScreen() {
                         <Text style={{ ...Typography.bodySmall, color: AppColors.border, lineHeight: 20 }}>
                             A 4-digit code was sent to{' '}
                             <Text style={{ color: AppColors.primary, textDecorationLine: 'underline' }}>
-                                admin12345@gmail.com
+                                {email ?? 'your email'}
                             </Text>
                         </Text>
                     </View>
@@ -143,17 +160,24 @@ export default function VerificationCodeScreen() {
                         ))}
                     </View>
 
+                    {verifyCodeMutation.error && (
+                        <Text style={{ ...Typography.bodySmall, color: AppColors.error }}>
+                            {verifyCodeMutation.error.message}
+                        </Text>
+                    )}
+
                     <Button
-                        title="Continue"
+                        title={verifyCodeMutation.isPending ? 'Verifying...' : 'Continue'}
                         onPress={handleContinue}
                         variant={allFilled ? 'primary' : 'disabled'}
+                        loading={verifyCodeMutation.isPending}
                     />
 
                     <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4 }}>
                         <Text style={{ ...Typography.bodySmall, color: AppColors.textPrimary }}>
                             {"Didn't receive code?"}
                         </Text>
-                        <Pressable hitSlop={8}>
+                        <Pressable hitSlop={8} onPress={handleResend} disabled={resendMutation.isPending}>
                             <Text
                                 style={{
                                     ...Typography.bodySmall,
@@ -162,7 +186,7 @@ export default function VerificationCodeScreen() {
                                     textDecorationLine: 'underline',
                                 }}
                             >
-                                Resend
+                                {resendMutation.isPending ? 'Sending...' : 'Resend'}
                             </Text>
                         </Pressable>
                     </View>

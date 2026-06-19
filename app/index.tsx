@@ -1,7 +1,16 @@
 import { Redirect } from 'expo-router';
+import { useAuth } from '@/lib/auth-context';
 
 export default function Index() {
-    // TODO: check auth state and redirect accordingly
-    // For now, always start at the auth splash
+    const { status } = useAuth();
+
+    if (status === 'loading') {
+        return null;
+    }
+
+    if (status === 'authed') {
+        return <Redirect href="/(doctor)/(tabs)" />;
+    }
+
     return <Redirect href="/(auth)/splash" />;
 }

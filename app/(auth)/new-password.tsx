@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Image, StatusBar, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { Button } from '@/components/ui/button';
 import { TextInput } from '@/components/ui/text-input';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
+import { useResetPasswordMutation } from '@/lib/hooks/use-auth-api';
+import { ApiError } from '@/lib/api-client';
 
 export default function NewPasswordScreen() {
     const router = useRouter();
     const { height } = useWindowDimensions();
+    const { email, otp } = useLocalSearchParams<{ email: string; otp: string }>();
+    const resetPasswordMutation = useResetPasswordMutation();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -24,7 +28,18 @@ export default function NewPasswordScreen() {
         setErrors(e);
         if (Object.keys(e).length > 0) return;
 
-        router.replace('/(auth)/login');
+        resetPasswordMutation.mutate(
+            { email, otp, password, password_confirmation: confirmPassword },
+            {
+                onSuccess: () => {
+                    router.replace('/(auth)/login');
+                },
+                onError: (err) => {
+                    const message = err instanceof ApiError ? err.message : err.message;
+                    setErrors({ submit: message });
+                },
+            },
+        );
     };
 
     return (
@@ -113,7 +128,17 @@ export default function NewPasswordScreen() {
                             error={errors.confirmPassword}
                         />
 
-                        <Button title="Reset Password" onPress={handleReset} />
+                        {errors.submit && (
+                            <Text style={{ ...Typography.bodySmall, color: AppColors.error }}>
+                                {errors.submit}
+                            </Text>
+                        )}
+
+                        <Button
+                            title={resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
+                            onPress={handleReset}
+                            loading={resetPasswordMutation.isPending}
+                        />
                     </View>
                 </View>
             </ScrollView>

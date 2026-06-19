@@ -9,22 +9,43 @@ import { TextInput } from '@/components/ui/text-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SocialLoginRow } from '@/components/ui/social-login-row';
 import { AppColors } from '@/constants/theme';
+import { useAuth } from '@/lib/auth-context';
+import { useLoginMutation } from '@/lib/hooks/use-auth-api';
+import { ApiError } from '@/lib/api-client';
 
 export default function LoginScreen() {
     const router = useRouter();
     const { height } = useWindowDimensions();
+    const { signIn } = useAuth();
+    const loginMutation = useLoginMutation();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
 
     const handleLogin = () => {
-        const emailLower = email.toLowerCase().trim();
-        if (emailLower.includes('admin')) {
-            router.replace('/(admin)');
-        } else {
-            router.replace('/(doctor)/(tabs)');
-        }
+        loginMutation.mutate(
+            { email: email.trim(), password },
+            {
+                onSuccess: async (data) => {
+                    await signIn(data.token, data.user);
+                    const role = data.user.role?.toLowerCase();
+                    const isAdmin = role === 'admin' || email.toLowerCase().trim().includes('admin');
+                    if (isAdmin) {
+                        router.replace('/(admin)');
+                    } else {
+                        router.replace('/(doctor)/(tabs)');
+                    }
+                },
+            },
+        );
     };
+
+    const loginErrorMessage =
+        loginMutation.error instanceof ApiError
+            ? loginMutation.error.message
+            : loginMutation.error
+                ? loginMutation.error.message
+                : null;
 
     const headerHeight = height * 0.30;
 
@@ -142,8 +163,18 @@ export default function LoginScreen() {
                             </View>
                         </View>
 
+                        {loginErrorMessage && (
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.error, marginLeft: 2 }}>
+                                {loginErrorMessage}
+                            </Text>
+                        )}
+
                         <View style={{ marginTop: 4 }}>
-                            <Button title="Login" onPress={handleLogin} />
+                            <Button
+                                title={loginMutation.isPending ? 'Signing in...' : 'Login'}
+                                onPress={handleLogin}
+                                loading={loginMutation.isPending}
+                            />
                         </View>
                     </Animated.View>
 

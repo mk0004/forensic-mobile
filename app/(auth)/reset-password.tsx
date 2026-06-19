@@ -5,16 +5,26 @@ import Svg, { Path } from 'react-native-svg';
 import { Button } from '@/components/ui/button';
 import { TextInput } from '@/components/ui/text-input';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
+import { useForgotPasswordMutation } from '@/lib/hooks/use-auth-api';
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
     const { height } = useWindowDimensions();
+    const forgotPasswordMutation = useForgotPasswordMutation();
     const [email, setEmail] = useState('');
 
     const navyHeight = height * 0.30;
 
     const handleSendLink = () => {
-        router.push('/(auth)/check-email');
+        const trimmed = email.trim();
+        forgotPasswordMutation.mutate(
+            { email: trimmed },
+            {
+                onSuccess: () => {
+                    router.push({ pathname: '/(auth)/check-email', params: { email: trimmed } });
+                },
+            },
+        );
     };
 
     return (
@@ -92,7 +102,16 @@ export default function ResetPasswordScreen() {
                             icon="email"
                             keyboardType="email-address"
                         />
-                        <Button title="Send Email" onPress={handleSendLink} />
+                        {forgotPasswordMutation.error && (
+                            <Text style={{ ...Typography.bodySmall, color: AppColors.error }}>
+                                {forgotPasswordMutation.error.message}
+                            </Text>
+                        )}
+                        <Button
+                            title={forgotPasswordMutation.isPending ? 'Sending...' : 'Send Email'}
+                            onPress={handleSendLink}
+                            loading={forgotPasswordMutation.isPending}
+                        />
                     </View>
                 </View>
             </ScrollView>

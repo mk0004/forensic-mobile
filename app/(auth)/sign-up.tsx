@@ -9,6 +9,8 @@ import { TextInput } from '@/components/ui/text-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SocialLoginRow } from '@/components/ui/social-login-row';
 import { AppColors } from '@/constants/theme';
+import { useRegisterMutation } from '@/lib/hooks/use-auth-api';
+import { ApiError } from '@/lib/api-client';
 
 function validateEmail(email: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -32,9 +34,44 @@ function validateDate(dateStr: string) {
     return d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd;
 }
 
+// The form captures MM/DD/YYYY; the API requires YYYY-MM-DD.
+function toApiDate(dateStr: string) {
+    const [mm, dd, yyyy] = dateStr.split('/');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+// The register endpoint returns a `{ msg, status, data: { field: [messages] } }`
+// envelope; map those server field errors back onto the local form fields.
+function mapServerFieldErrors(body?: string): Record<string, string> {
+    if (!body) return {};
+    try {
+        const parsed = JSON.parse(body) as { data?: Record<string, unknown> };
+        const data = parsed.data;
+        if (!data || typeof data !== 'object') return {};
+        const fieldMap: Record<string, string> = {
+            national_id: 'nationalId',
+            phone_number: 'phone',
+            date_of_birth: 'dob',
+            name: 'firstName',
+            email: 'email',
+            password: 'password',
+        };
+        const mapped: Record<string, string> = {};
+        for (const [serverField, messages] of Object.entries(data)) {
+            const key = fieldMap[serverField] ?? serverField;
+            const message = Array.isArray(messages) ? String(messages[0]) : String(messages);
+            mapped[key] = message;
+        }
+        return mapped;
+    } catch {
+        return {};
+    }
+}
+
 export default function SignUpScreen() {
     const router = useRouter();
     const { height } = useWindowDimensions();
+    const registerMutation = useRegisterMutation();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
@@ -71,7 +108,31 @@ export default function SignUpScreen() {
 
     const handleSignUp = () => {
         if (!validate()) return;
-        router.replace('/(auth)/login');
+        const name = `${firstName} ${lastName}`.trim();
+        registerMutation.mutate(
+            {
+                name,
+                email: email.trim(),
+                password,
+                phone_number: phone.replace(/[\s-]/g, ''),
+                national_id: nationalId,
+                date_of_birth: toApiDate(dob),
+            },
+            {
+                onSuccess: () => {
+                    router.replace('/(auth)/login');
+                },
+                onError: (err) => {
+                    const fieldErrors = err instanceof ApiError ? mapServerFieldErrors(err.body) : {};
+                    const message = err.message;
+                    if (Object.keys(fieldErrors).length > 0) {
+                        setErrors({ ...fieldErrors, submit: message });
+                    } else {
+                        setErrors({ submit: message });
+                    }
+                },
+            },
+        );
     };
 
     const handleNationalIdChange = (text: string) => {
@@ -297,8 +358,18 @@ export default function SignUpScreen() {
                             )}
                         </View>
 
+                        {errors.submit && (
+                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.error, marginLeft: 4 }}>
+                                {errors.submit}
+                            </Text>
+                        )}
+
                         <View style={{ marginTop: 4 }}>
-                            <Button title="Create Account" onPress={handleSignUp} />
+                            <Button
+                                title={registerMutation.isPending ? 'Creating...' : 'Create Account'}
+                                onPress={handleSignUp}
+                                loading={registerMutation.isPending}
+                            />
                         </View>
                     </Animated.View>
 

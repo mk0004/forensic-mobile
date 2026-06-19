@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, TextInput as RNTextInput, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, Switch, TextInput as RNTextInput, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -8,6 +8,9 @@ import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
 import { TabSlideIn } from '@/components/tab-slide-in';
+import { useAuth } from '@/lib/auth-context';
+import { useSettingQuery, useSaveChangeMutation, SettingResult } from '@/lib/hooks/use-auth-api';
+import { User } from '@/types/api';
 
 /* ─── SVG Icons ─── */
 function UserIcon() {
@@ -264,15 +267,51 @@ const initialInfo = {
     yearsOfExperience: '7',
 };
 
+type ProfileInfo = typeof initialInfo;
+
+function resolveUser(result: SettingResult): User | null {
+    if ('user' in result && result.user) {
+        return result.user;
+    }
+    if ('email' in result && typeof result.email === 'string') {
+        return result as User;
+    }
+    return null;
+}
+
+function userToInfo(user: User, base: ProfileInfo): ProfileInfo {
+    const [firstName, ...rest] = user.name.trim().split(' ');
+    return {
+        ...base,
+        firstName: firstName ?? '',
+        lastName: rest.join(' '),
+        email: user.email,
+        phone: user.phone_number ?? base.phone,
+        dob: user.date_of_birth ?? base.dob,
+        nationalId: user.national_id ?? base.nationalId,
+    };
+}
+
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { signOut } = useAuth();
+    const settingQuery = useSettingQuery();
+    const saveChangeMutation = useSaveChangeMutation();
     const swipeHandlers = useSwipeTabs(3);
     const [activeTab, setActiveTab] = useState<'personal' | 'settings'>('personal');
     const [notifications, setNotifications] = useState(true);
-    const [info, setInfo] = useState(initialInfo);
+    const [info, setInfo] = useState<ProfileInfo>(initialInfo);
     const [showDiscard, setShowDiscard] = useState(false);
     const [editing, setEditing] = useState(false);
+
+    useEffect(() => {
+        if (!settingQuery.data) return;
+        const user = resolveUser(settingQuery.data);
+        if (user) {
+            setInfo((prev) => userToInfo(user, prev));
+        }
+    }, [settingQuery.data]);
 
     // Animated tab indicator
     const tabAnim = useRef(new Animated.Value(0)).current;
@@ -287,8 +326,27 @@ export default function SettingsScreen() {
 
     const isDirty = JSON.stringify(info) !== JSON.stringify(initialInfo);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await signOut();
         router.replace('/(auth)/login');
+    };
+
+    const handleSave = () => {
+        const name = `${info.firstName} ${info.lastName}`.trim();
+        saveChangeMutation.mutate(
+            {
+                name,
+                email: info.email,
+                phone_number: info.phone,
+                date_of_birth: info.dob,
+                national_id: info.nationalId,
+            },
+            {
+                onSuccess: () => {
+                    setEditing(false);
+                },
+            },
+        );
     };
 
     const updateField = (key: keyof typeof info) => (val: string) => setInfo(prev => ({ ...prev, [key]: val }));
@@ -396,6 +454,17 @@ export default function SettingsScreen() {
                     {/* ─── Personal Info Tab ─── */}
                     {activeTab === 'personal' && (
                         <>
+                            {settingQuery.isLoading && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 8 }}>
+                                    <ActivityIndicator color={AppColors.primary} />
+                                    <Text style={{ ...Typography.bodySmall, color: '#9CA3AF' }}>Loading profile...</Text>
+                                </View>
+                            )}
+                            {settingQuery.error && (
+                                <Text style={{ ...Typography.bodySmall, color: AppColors.error, textAlign: 'center' }}>
+                                    {settingQuery.error.message}
+                                </Text>
+                            )}
                             <SectionCard title="Personal Information">
                                 <View style={{ paddingVertical: 4 }}>
                                     {([
@@ -460,7 +529,8 @@ export default function SettingsScreen() {
                                             <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Cancel</Text>
                                         </Pressable>
                                         <Pressable
-                                            onPress={() => setEditing(false)}
+                                            onPress={handleSave}
+                                            disabled={saveChangeMutation.isPending}
                                             style={({ pressed }) => ({
                                                 flex: 1,
                                                 height: 48,
@@ -470,7 +540,11 @@ export default function SettingsScreen() {
                                                 justifyContent: 'center',
                                             })}
                                         >
-                                            <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Save Changes</Text>
+                                            {saveChangeMutation.isPending ? (
+                                                <ActivityIndicator color={AppColors.white} />
+                                            ) : (
+                                                <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Save Changes</Text>
+                                            )}
                                         </Pressable>
                                     </View>
                                 ) : (
