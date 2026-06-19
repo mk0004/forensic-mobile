@@ -9,6 +9,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '@/constants/theme';
+import {
+    useConversationsQuery,
+    useMessagesQuery,
+    useSendMessageMutation,
+} from '@/lib/hooks/use-chat-api';
+import type { ChatConversation, ChatMessage } from '@/types/api';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.78;
@@ -61,21 +67,6 @@ interface Message { id: string; role: 'user' | 'ai'; text: string }
 
 const GREETING = "Good morning, Dr. Khaled. I'm your forensic intelligence assistant. I can help with case analysis, DNA profiling, evidence chain-of-custody, facial recognition, and deepfake detection.\n\nHow can I assist you today?";
 
-function generateAiResponse(msg: string): string {
-    const l = msg.toLowerCase();
-    if (l.includes('dna') || l.includes('sample') || l.includes('profil'))
-        return 'Initiating STR profile lookup. The submitted sample (Reference: EV-2024-0847) shows a 13-locus match with 99.97% confidence. Chain-of-custody log verified — 3 transfers recorded.\n\nShall I generate the full comparison report?';
-    if (l.includes('evidence') || l.includes('review'))
-        return 'Evidence catalog updated. Current case FC-2024-112 contains 14 items across 3 categories:\n\n• Physical (7): Fingerprints, fibers, blood samples\n• Digital (4): Device images, metadata extracts\n• Documentary (3): Witness statements, scene reports\n\nWhich category would you like to review?';
-    if (l.includes('case') || l.includes('summary'))
-        return 'Case FC-2024-112 Summary:\n\n• Status: Active — Investigation Phase\n• Lead: Dr. Khaled\n• Evidence Items: 14 cataloged\n• Suspects: 2 persons of interest\n• Last Update: 2 hours ago\n\nPriority action: DNA cross-reference pending on Sample EV-0847. Shall I initiate?';
-    if (l.includes('face') || l.includes('recognition') || l.includes('deepfake'))
-        return 'Facial recognition engine ready. Model confidence threshold set at 92%. For optimal results, input images should be ≥720p with frontal orientation.\n\nLast scan (Case FC-2024-108) returned 2 matches above threshold. Run new analysis?';
-    if (l.includes('help') || l.includes('what can'))
-        return "I can assist with:\n\n• Case analysis & evidence review\n• DNA sample processing & STR profiling\n• Facial recognition & deepfake detection\n• Image reconstruction & enhancement\n• Chain-of-custody verification\n• Forensic report generation\n\nWhat would you like to explore?";
-    return "I've reviewed the relevant case data. Based on available evidence patterns, I recommend a multi-modal analysis combining physical trace evidence with digital forensics. This approach has shown 94% accuracy in similar cases.\n\nShall I prepare a detailed protocol?";
-}
-
 const SUGGESTIONS = [
     { label: 'DNA Analysis', query: 'Run DNA analysis on the latest sample' },
     { label: 'Evidence Review', query: 'Review evidence for the current case' },
@@ -85,13 +76,37 @@ const SUGGESTIONS = [
 
 interface ChatThread { id: string; title: string; time: string; messages: Message[] }
 
-const INITIAL_CHATS: ChatThread[] = [
-    { id: 'p1', title: 'DNA analysis on Sample EV-0847', time: 'Yesterday', messages: [] },
-    { id: 'p2', title: 'Case #2024-0892 evidence review', time: 'Yesterday', messages: [] },
-    { id: 'p3', title: 'Facial recognition — Case #108', time: 'Dec 18', messages: [] },
-    { id: 'p4', title: 'Deepfake detection results', time: 'Dec 18', messages: [] },
-    { id: 'p5', title: 'Chain of custody verification', time: 'Dec 17', messages: [] },
-];
+function formatThreadTime(timestamp?: string): string {
+    if (!timestamp) return '';
+    const parsed = new Date(timestamp);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const now = new Date();
+    const sameDay = parsed.toDateString() === now.toDateString();
+    if (sameDay) return 'Today';
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (parsed.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function conversationToThread(conv: ChatConversation): ChatThread {
+    const title = conv.title?.trim() || conv.last_message?.trim() || `Conversation ${conv.id}`;
+    return {
+        id: String(conv.id),
+        title,
+        time: formatThreadTime(conv.updated_at ?? conv.created_at),
+        messages: [],
+    };
+}
+
+function chatMessageToMessage(msg: ChatMessage): Message {
+    const isUser = (msg.role ?? '').toLowerCase() === 'user';
+    return {
+        id: String(msg.id),
+        role: isUser ? 'user' : 'ai',
+        text: msg.content ?? '',
+    };
+}
 
 /* ─── Component ─── */
 export default function AiChat() {
@@ -100,31 +115,39 @@ export default function AiChat() {
     const { q } = useLocalSearchParams<{ q?: string }>();
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
-    const [isTyping, setIsTyping] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [chatHistory, setChatHistory] = useState<ChatThread[]>(INITIAL_CHATS);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+    const conversationsQuery = useConversationsQuery();
+    const messagesQuery = useMessagesQuery(activeChatId);
+    const sendMessage_mutation = useSendMessageMutation();
+    const isTyping = sendMessage_mutation.isPending;
+
+    const chatHistory: ChatThread[] = (conversationsQuery.data ?? []).map(conversationToThread);
     const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
     const overlayOpacity = useRef(new Animated.Value(0)).current;
     const scrollRef = useRef<ScrollView>(null);
     const inputRef = useRef<RNTextInput>(null);
 
+    const sentInitialRef = useRef(false);
     useEffect(() => {
-        const initial: Message[] = [{ id: '0', role: 'ai', text: GREETING }];
-        if (q) {
-            initial.push({ id: '1', role: 'user', text: q });
-            // Simulate typing for the initial query response
-            setMessages(initial);
-            setIsTyping(true);
-            const timer = setTimeout(() => {
-                setIsTyping(false);
-                setMessages(prev => [...prev, { id: '2', role: 'ai', text: generateAiResponse(q) }]);
-            }, 800);
-            return () => clearTimeout(timer);
+        setMessages([{ id: '0', role: 'ai', text: GREETING }]);
+        if (q && !sentInitialRef.current) {
+            sentInitialRef.current = true;
+            sendMessage(q);
         }
-        setMessages(initial);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (!activeChatId) return;
+        const data = messagesQuery.data;
+        if (!data) return;
+        const mapped = data.map(chatMessageToMessage);
+        setMessages(mapped.length > 0 ? mapped : [{ id: '0', role: 'ai', text: GREETING }]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messagesQuery.data, activeChatId]);
 
     const openDrawer = () => {
         setDrawerOpen(true);
@@ -144,27 +167,7 @@ export default function AiChat() {
         });
     };
 
-    const saveCurrentChat = () => {
-        // Only save if there are user messages (not just the greeting)
-        const userMsgs = messages.filter(m => m.role === 'user');
-        if (userMsgs.length > 0 && activeChatId) {
-            setChatHistory(prev => prev.map(c =>
-                c.id === activeChatId ? { ...c, messages: [...messages] } : c
-            ));
-        } else if (userMsgs.length > 0) {
-            const title = userMsgs[0].text.slice(0, 50) + (userMsgs[0].text.length > 50 ? '...' : '');
-            const newThread: ChatThread = {
-                id: Date.now().toString(),
-                title,
-                time: 'Today',
-                messages: [...messages],
-            };
-            setChatHistory(prev => [newThread, ...prev]);
-        }
-    };
-
     const newChat = () => {
-        saveCurrentChat();
         closeDrawer();
         setMessages([{ id: '0', role: 'ai', text: GREETING }]);
         setInput('');
@@ -172,14 +175,9 @@ export default function AiChat() {
     };
 
     const loadChat = (chat: ChatThread) => {
-        saveCurrentChat();
         closeDrawer();
         setActiveChatId(chat.id);
-        if (chat.messages.length > 0) {
-            setMessages(chat.messages);
-        } else {
-            setMessages([{ id: '0', role: 'ai', text: GREETING }]);
-        }
+        setMessages([{ id: '0', role: 'ai', text: GREETING }]);
         setInput('');
     };
 
@@ -187,19 +185,33 @@ export default function AiChat() {
         !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const dispatchSend = (trimmed: string) => {
+        sendMessage_mutation.mutate(
+            { query: trimmed, conversationId: activeChatId },
+            {
+                onSuccess: (result) => {
+                    const reply = result.reply.trim() || "I couldn't generate a response. Please try again.";
+                    setMessages(prev => [...prev, { id: `${Date.now() + 1}`, role: 'ai', text: reply }]);
+                    if (result.conversationId !== undefined && !activeChatId) {
+                        setActiveChatId(String(result.conversationId));
+                    }
+                },
+                onError: (err) => {
+                    const text = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+                    setMessages(prev => [...prev, { id: `${Date.now() + 1}`, role: 'ai', text: `⚠️ ${text}` }]);
+                },
+            },
+        );
+    };
+
     const sendMessage = (text?: string) => {
         const trimmed = (text ?? input).trim();
-        if (!trimmed) return;
+        if (!trimmed || sendMessage_mutation.isPending) return;
 
         const userMsg: Message = { id: Date.now().toString(), role: 'user', text: trimmed };
         setMessages(prev => [...prev, userMsg]);
         setInput('');
-        setIsTyping(true);
-
-        setTimeout(() => {
-            setIsTyping(false);
-            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', text: generateAiResponse(trimmed) }]);
-        }, 800);
+        dispatchSend(trimmed);
     };
 
     const scrollToEnd = () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
@@ -213,16 +225,12 @@ export default function AiChat() {
     };
 
     const retryLastMessage = () => {
+        if (sendMessage_mutation.isPending) return;
         const lastUserIdx = [...messages].reverse().findIndex(m => m.role === 'user');
         if (lastUserIdx === -1) return;
         const lastUser = messages[messages.length - 1 - lastUserIdx];
-        // Remove last AI response and re-send
         setMessages(prev => prev.filter((_, i) => i < prev.length - 1));
-        setIsTyping(true);
-        setTimeout(() => {
-            setIsTyping(false);
-            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', text: generateAiResponse(lastUser.text) }]);
-        }, 800);
+        dispatchSend(lastUser.text);
     };
 
     /* ─── AI Bubble ─── */

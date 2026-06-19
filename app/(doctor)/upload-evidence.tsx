@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -7,6 +7,8 @@ import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 import { BottomDrawer } from '@/components/bottom-drawer';
 import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, ChevronRightIcon as ChevronRightModelIcon, SkipIcon } from '@/components/model-icons';
+import { useActiveCasesQuery } from '@/lib/hooks/use-cases-api';
+import { useSaveAsEvidenceMutation } from '@/lib/hooks/use-evidence-api';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -69,8 +71,6 @@ function ChevronIcon() {
     );
 }
 
-const mockCases = ['Case #001 - Suspicious Fire', 'Case #002 - Vehicle Theft', 'Case #003 - Homicide Investigation', 'Case #004 - Cyber Fraud'];
-
 const MODEL_OPTIONS = [
     { key: 'deepfake', title: 'Deep Fake Detection', description: 'Detect AI-generated or manipulated images', icon: DeepFakeIcon },
     { key: 'face', title: 'Face Recognition', description: 'Identify faces against a reference database', icon: FaceIcon },
@@ -96,9 +96,13 @@ export default function UploadEvidence() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams<{ caseId?: string }>();
+    const { data: cases, isLoading: casesLoading } = useActiveCasesQuery();
+    const saveEvidence = useSaveAsEvidenceMutation();
     const [evidenceName, setEvidenceName] = useState('');
     const [description, setDescription] = useState('');
-    const [selectedCase, setSelectedCase] = useState(params.caseId ? mockCases.find(c => c.includes(params.caseId!)) || '' : '');
+    const [selectedCaseId, setSelectedCaseId] = useState<number | null>(
+        params.caseId ? Number(params.caseId) : null,
+    );
     const [selectedModelKey, setSelectedModelKey] = useState<string>('');
     const [caseDropdownOpen, setCaseDropdownOpen] = useState(false);
     const [modelDrawerOpen, setModelDrawerOpen] = useState(false);
@@ -108,7 +112,10 @@ export default function UploadEvidence() {
     ]);
     const [showDiscard, setShowDiscard] = useState(false);
     const [successDrawerVisible, setSuccessDrawerVisible] = useState(false);
-    const isDirty = evidenceName.length > 0 || description.length > 0 || selectedCase.length > 0 || selectedModelKey.length > 0;
+
+    const caseOptions = (cases ?? []).map((c) => ({ id: c.id, label: `Case #${c.id} - ${c.name}` }));
+    const selectedCaseLabel = caseOptions.find((c) => c.id === selectedCaseId)?.label ?? '';
+    const isDirty = evidenceName.length > 0 || description.length > 0 || selectedCaseId !== null || selectedModelKey.length > 0;
 
     const handleBack = () => {
         if (isDirty) { setShowDiscard(true); } else { router.back(); }
@@ -139,7 +146,20 @@ export default function UploadEvidence() {
     };
 
     const handleSubmit = () => {
-        setSuccessDrawerVisible(true);
+        if (selectedCaseId === null) {
+            return;
+        }
+        saveEvidence.mutate(
+            {
+                name: evidenceName,
+                model_used: selectedModelKey,
+                case_id: selectedCaseId,
+                data: description ? { description } : {},
+            },
+            {
+                onSuccess: () => setSuccessDrawerVisible(true),
+            },
+        );
     };
 
     return (
@@ -304,8 +324,8 @@ export default function UploadEvidence() {
                                     height: 48, paddingHorizontal: 14,
                                 }}
                             >
-                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: selectedCase ? AppColors.textPrimary : '#D1D5DB' }}>
-                                    {selectedCase || 'Choose a case'}
+                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: selectedCaseLabel ? AppColors.textPrimary : '#D1D5DB' }}>
+                                    {selectedCaseLabel || 'Choose a case'}
                                 </Text>
                                 <ChevronIcon />
                             </Pressable>
@@ -315,18 +335,28 @@ export default function UploadEvidence() {
                                     backgroundColor: AppColors.white, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB',
                                     overflow: 'hidden', elevation: 4, zIndex: 30,
                                 }}>
-                                    {mockCases.map((c) => (
-                                        <Pressable
-                                            key={c}
-                                            onPress={() => { setSelectedCase(c); setCaseDropdownOpen(false); }}
-                                            style={({ pressed }) => ({
-                                                paddingVertical: 12, paddingHorizontal: 14,
-                                                backgroundColor: pressed ? '#F3F4F6' : selectedCase === c ? '#F0F4FF' : AppColors.white,
-                                            })}
-                                        >
-                                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}>{c}</Text>
-                                        </Pressable>
-                                    ))}
+                                    {casesLoading ? (
+                                        <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                                            <ActivityIndicator color={AppColors.primary} />
+                                        </View>
+                                    ) : caseOptions.length === 0 ? (
+                                        <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>No active cases</Text>
+                                        </View>
+                                    ) : (
+                                        caseOptions.map((c) => (
+                                            <Pressable
+                                                key={c.id}
+                                                onPress={() => { setSelectedCaseId(c.id); setCaseDropdownOpen(false); }}
+                                                style={({ pressed }) => ({
+                                                    paddingVertical: 12, paddingHorizontal: 14,
+                                                    backgroundColor: pressed ? '#F3F4F6' : selectedCaseId === c.id ? '#F0F4FF' : AppColors.white,
+                                                })}
+                                            >
+                                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary }}>{c.label}</Text>
+                                            </Pressable>
+                                        ))
+                                    )}
                                 </View>
                             )}
                         </View>
@@ -396,9 +426,12 @@ export default function UploadEvidence() {
                         </Pressable>
                         <Pressable
                             onPress={handleSubmit}
+                            disabled={saveEvidence.isPending || selectedCaseId === null}
                             style={({ pressed }) => ({
                                 flex: 1,
-                                backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
+                                backgroundColor: selectedCaseId === null
+                                    ? '#D1D5DB'
+                                    : pressed ? AppColors.primaryHover : AppColors.primary,
                                 borderRadius: 14,
                                 height: 52,
                                 flexDirection: 'row',
@@ -407,12 +440,18 @@ export default function UploadEvidence() {
                                 gap: 6,
                             })}
                         >
-                            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                                <Path d="M12 5v14M5 12h14" stroke={AppColors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-                            </Svg>
-                            <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
-                                {selectedModelKey ? 'Analyze' : 'Upload'}
-                            </Text>
+                            {saveEvidence.isPending ? (
+                                <ActivityIndicator color={AppColors.white} />
+                            ) : (
+                                <>
+                                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                                        <Path d="M12 5v14M5 12h14" stroke={AppColors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                                    </Svg>
+                                    <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
+                                        {selectedModelKey ? 'Analyze' : 'Upload'}
+                                    </Text>
+                                </>
+                            )}
                         </Pressable>
                     </View>
                 </View>

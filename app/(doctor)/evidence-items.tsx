@@ -1,8 +1,10 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
+import { useEvidenceListQuery, useDeleteEvidenceMutation } from '@/lib/hooks/use-evidence-api';
+import type { Evidence } from '@/types/api';
 
 function BackIcon() {
     return (
@@ -104,26 +106,61 @@ function CalendarIcon() {
 
 interface EvidenceItem {
     id: string;
+    caseId: number;
     title: string;
     type: 'image' | 'video' | 'dna' | 'document';
     typeLabel: string;
-    size: string;
-    caseId: string;
-    date: string;
+    caseLabel: string;
 }
 
-const evidenceItems: EvidenceItem[] = [
-    { id: '1', title: 'Crime Scene Photo - Front Door', type: 'image', typeLabel: 'Image', size: '4.2 MB', caseId: 'CS-2024-0891', date: '2024-02-20' },
-    { id: '2', title: 'DNA Sample - Blood Stain', type: 'dna', typeLabel: 'DNA Sample', size: '1.2 MB', caseId: 'CS-2024-0891', date: '2024-02-20' },
-    { id: '3', title: 'Witness Statement Document', type: 'image', typeLabel: 'Image', size: '4.2 MB', caseId: 'CS-2024-0891', date: '2024-02-20' },
-    { id: '4', title: 'CCTV Footage - Bank Entrance', type: 'video', typeLabel: 'Image', size: '4.2 MB', caseId: 'CS-2024-0891', date: '2024-02-20' },
-    { id: '5', title: 'Fingerprint Scan - Door Handle', type: 'image', typeLabel: 'Image', size: '4.2 MB', caseId: 'CS-2024-0891', date: '2024-02-20' },
-    { id: '6', title: 'Security Camera - Parking Lot', type: 'video', typeLabel: 'Video', size: '12.8 MB', caseId: 'CS-2024-0891', date: '2024-02-19' },
-];
+function deriveType(modelUsed: string): { type: EvidenceItem['type']; typeLabel: string } {
+    const model = (modelUsed || '').toLowerCase();
+    if (model.includes('dna')) {
+        return { type: 'dna', typeLabel: 'DNA Sample' };
+    }
+    if (model.includes('reconstruct') || model.includes('deepfake') || model.includes('deep fake') || model.includes('face') || model.includes('image')) {
+        return { type: 'image', typeLabel: modelUsed || 'Image' };
+    }
+    if (model.includes('video') || model.includes('cctv')) {
+        return { type: 'video', typeLabel: modelUsed || 'Video' };
+    }
+    return { type: 'document', typeLabel: modelUsed || 'Document' };
+}
+
+function mapEvidence(ev: Evidence): EvidenceItem {
+    const { type, typeLabel } = deriveType(ev.model_used);
+    return {
+        id: String(ev.id),
+        caseId: ev.case_id,
+        title: ev.name,
+        type,
+        typeLabel,
+        caseLabel: `CASE-${ev.case_id}`,
+    };
+}
 
 export default function EvidenceItems() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { data, isLoading, isError, error } = useEvidenceListQuery();
+    const deleteEvidence = useDeleteEvidenceMutation();
+
+    const evidenceItems: EvidenceItem[] = (data ?? []).map(mapEvidence);
+
+    const handleDelete = (item: EvidenceItem) => {
+        Alert.alert(
+            'Delete Evidence',
+            `Are you sure you want to delete "${item.title}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => deleteEvidence.mutate({ evidenceId: item.id, caseId: item.caseId }),
+                },
+            ],
+        );
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -156,6 +193,23 @@ export default function EvidenceItems() {
                 </View>
 
                 {/* Evidence list */}
+                {isLoading ? (
+                    <View style={{ paddingTop: 60, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={AppColors.primary} />
+                    </View>
+                ) : isError ? (
+                    <View style={{ paddingTop: 60, paddingHorizontal: Spacing.md, alignItems: 'center', gap: 8 }}>
+                        <Text selectable style={{ fontSize: 14, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.error, textAlign: 'center' }}>
+                            {error instanceof Error ? error.message : 'Failed to load evidence'}
+                        </Text>
+                    </View>
+                ) : evidenceItems.length === 0 ? (
+                    <View style={{ paddingTop: 60, paddingHorizontal: Spacing.md, alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_500Medium', color: '#9CA3AF', textAlign: 'center' }}>
+                            No evidence items yet
+                        </Text>
+                    </View>
+                ) : (
                 <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, gap: 12 }}>
                     {evidenceItems.map((item) => (
                         <View
@@ -197,15 +251,15 @@ export default function EvidenceItems() {
                                         {item.title}
                                     </Text>
                                     <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
-                                        {item.typeLabel} • {item.size}
+                                        {item.typeLabel}
                                     </Text>
                                     <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                        {item.caseId}
+                                        {item.caseLabel}
                                     </Text>
                                 </View>
                             </View>
 
-                            {/* Bottom row: date + actions */}
+                            {/* Bottom row: case + actions */}
                             <View
                                 style={{
                                     flexDirection: 'row',
@@ -220,7 +274,7 @@ export default function EvidenceItems() {
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                     <CalendarIcon />
                                     <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                        {item.date}
+                                        {item.caseLabel}
                                     </Text>
                                 </View>
 
@@ -228,7 +282,11 @@ export default function EvidenceItems() {
                                     <Pressable hitSlop={8}>
                                         <EditIcon />
                                     </Pressable>
-                                    <Pressable hitSlop={8}>
+                                    <Pressable
+                                        hitSlop={8}
+                                        onPress={() => handleDelete(item)}
+                                        disabled={deleteEvidence.isPending}
+                                    >
                                         <TrashIcon />
                                     </Pressable>
                                 </View>
@@ -236,6 +294,7 @@ export default function EvidenceItems() {
                         </View>
                     ))}
                 </View>
+                )}
             </ScrollView>
         </View>
     );
