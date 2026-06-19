@@ -20,13 +20,18 @@ interface RecentActivityRow {
     updated: string;
 }
 
+interface NotificationRow {
+    id: string;
+    title: string;
+    subtitle: string;
+    time: string;
+    caseId: string;
+    read: boolean;
+}
+
 // The dashboard API exposes overview stats and chart data only — it carries no
-// recent-activity list, so these rows are shown as a static placeholder.
-const FALLBACK_ACTIVITY: RecentActivityRow[] = [
-    { id: '#2024-0892', title: 'Digital Forgery Case', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '2h ago' },
-    { id: '#2024-0891', title: 'Identity Verification', status: 'Completed', statusColor: AppColors.success, statusBg: '#DCFCE7', updated: '5h ago' },
-    { id: '#2024-0890', title: 'Evidence Authentication', status: 'In Progress', statusColor: '#D97706', statusBg: '#FEF3C7', updated: '1d ago' },
-];
+// recent-activity list, so this section renders an empty state until the
+// backend provides one.
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -153,11 +158,7 @@ export default function DoctorDashboard() {
     const swipeHandlers = useSwipeTabs(0);
     const [drawerVisible, setDrawerVisible] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
-    const [notifications, setNotifications] = useState([
-        { id: '1', title: 'Deep Fake Analysis Complete', subtitle: 'Case #2024-0892 — Evidence flagged as manipulated', time: '2m ago', caseId: '2024-0892', read: false },
-        { id: '2', title: 'Face Recognition Done', subtitle: 'Case #2024-0756 — 2 matches found', time: '15m ago', caseId: '2024-0756', read: false },
-        { id: '3', title: 'DNA Analysis Finished', subtitle: 'Case #2024-0891 — Results ready for review', time: '1h ago', caseId: '2024-0891', read: true },
-    ]);
+    const [notifications, setNotifications] = useState<NotificationRow[]>([]);
     const unreadCount = notifications.filter(n => !n.read).length;
 
     const dashboardQuery = useDashboardQuery();
@@ -165,7 +166,7 @@ export default function DoctorDashboard() {
     const activeCount = overview?.active_cases.total ?? 0;
     const evidenceCount = overview?.evidences.total ?? 0;
     const completedCount = overview?.completed_cases.total ?? 0;
-    const recentActivity: RecentActivityRow[] = FALLBACK_ACTIVITY;
+    const recentActivity: RecentActivityRow[] = [];
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }} {...swipeHandlers}>
@@ -455,6 +456,15 @@ export default function DoctorDashboard() {
                                 <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center' }}>
                                     <ActivityIndicator color={AppColors.primary} />
                                 </View>
+                            ) : recentActivity.length === 0 ? (
+                                <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                    <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>
+                                        No recent activity
+                                    </Text>
+                                    <Text style={{ ...Typography.caption, color: '#D1D5DB', textAlign: 'center' }}>
+                                        Activity from your cases will appear here
+                                    </Text>
+                                </View>
                             ) : (
                                 recentActivity.map((item, idx, arr) => (
                                     <Pressable
@@ -628,6 +638,16 @@ export default function DoctorDashboard() {
                         </View>
 
                         {/* Notification Items */}
+                        {notifications.length === 0 && (
+                            <View style={{ paddingVertical: 32, paddingHorizontal: 16, alignItems: 'center', gap: 4 }}>
+                                <Text style={{ ...Typography.bodySmall, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>
+                                    You&apos;re all caught up
+                                </Text>
+                                <Text style={{ ...Typography.caption, color: '#D1D5DB', textAlign: 'center' }}>
+                                    New notifications will appear here
+                                </Text>
+                            </View>
+                        )}
                         {notifications.map((n, i) => (
                             <Pressable
                                 key={n.id}
