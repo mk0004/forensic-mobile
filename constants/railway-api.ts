@@ -1,4 +1,7 @@
-export const RAILWAY_API_BASE_URL = 'https://forensic-ai-system-api-production.up.railway.app';
+// Local backend exposed via ngrok proxy (works on phone/emulator/web over HTTPS).
+// Swap back to the production URL below when done testing locally.
+export const RAILWAY_API_BASE_URL = 'https://70bd-156-207-236-40.ngrok-free.app';
+// export const RAILWAY_API_BASE_URL = 'https://forensic-ai-system-api-production.up.railway.app';
 
 export const RAILWAY_ENDPOINTS = {
   // Auth
