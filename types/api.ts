@@ -160,6 +160,8 @@ export interface DashboardData {
 }
 
 export interface SettingResponse {
-  user?: User; // verify on first 200
-  data?: Record<string, unknown>; // verify on first 200
+  status?: boolean;
+  message?: string;
+  user?: User; // some deployments return the user at top level
+  data?: User; // the live API wraps the user under `data`
 }

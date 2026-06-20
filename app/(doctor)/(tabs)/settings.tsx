@@ -9,8 +9,8 @@ import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
 import { TabSlideIn } from '@/components/tab-slide-in';
 import { useAuth } from '@/lib/auth-context';
-import { useSettingQuery, useSaveChangeMutation, SettingResult } from '@/lib/hooks/use-auth-api';
-import { User } from '@/types/api';
+import { useSettingQuery, useSaveChangeMutation, useChangePasswordMutation, SettingResult } from '@/lib/hooks/use-auth-api';
+import { User, SettingResponse } from '@/types/api';
 
 /* ─── SVG Icons ─── */
 function UserIcon() {
@@ -258,37 +258,35 @@ function Divider() {
 /* ─── Main ─── */
 
 const initialInfo = {
-    firstName: 'Mohammed',
-    lastName: 'Sakr',
-    email: 'mohammedsakr87@gmail.com',
-    phone: '01030860764',
-    dob: '05/03/1967',
-    nationalId: '30402151302829',
-    yearsOfExperience: '7',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    dob: '',
+    nationalId: '',
 };
 
 type ProfileInfo = typeof initialInfo;
 
 function resolveUser(result: SettingResult): User | null {
-    if ('user' in result && result.user) {
-        return result.user;
-    }
-    if ('email' in result && typeof result.email === 'string') {
-        return result as User;
+    const candidate = (result as SettingResponse).data
+        ?? (result as SettingResponse).user
+        ?? result;
+    if (candidate && typeof (candidate as User).email === 'string') {
+        return candidate as User;
     }
     return null;
 }
 
-function userToInfo(user: User, base: ProfileInfo): ProfileInfo {
-    const [firstName, ...rest] = user.name.trim().split(' ');
+function userToInfo(user: User): ProfileInfo {
+    const [firstName, ...rest] = (user.name ?? '').trim().split(' ');
     return {
-        ...base,
         firstName: firstName ?? '',
         lastName: rest.join(' '),
-        email: user.email,
-        phone: user.phone_number ?? base.phone,
-        dob: user.date_of_birth ?? base.dob,
-        nationalId: user.national_id ?? base.nationalId,
+        email: user.email ?? '',
+        phone: user.phone_number ?? '',
+        dob: user.date_of_birth ?? '',
+        nationalId: user.national_id ?? '',
     };
 }
 
@@ -298,10 +296,18 @@ export default function SettingsScreen() {
     const { signOut } = useAuth();
     const settingQuery = useSettingQuery();
     const saveChangeMutation = useSaveChangeMutation();
+    const changePasswordMutation = useChangePasswordMutation();
     const swipeHandlers = useSwipeTabs(3);
+    const [pwOpen, setPwOpen] = useState(false);
+    const [currentPw, setCurrentPw] = useState('');
+    const [newPw, setNewPw] = useState('');
+    const [confirmPw, setConfirmPw] = useState('');
+    const [pwError, setPwError] = useState('');
+    const [pwSuccess, setPwSuccess] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'settings'>('personal');
     const [notifications, setNotifications] = useState(true);
     const [info, setInfo] = useState<ProfileInfo>(initialInfo);
+    const [baseline, setBaseline] = useState<ProfileInfo>(initialInfo);
     const [showDiscard, setShowDiscard] = useState(false);
     const [editing, setEditing] = useState(false);
 
@@ -309,7 +315,9 @@ export default function SettingsScreen() {
         if (!settingQuery.data) return;
         const user = resolveUser(settingQuery.data);
         if (user) {
-            setInfo((prev) => userToInfo(user, prev));
+            const mapped = userToInfo(user);
+            setInfo(mapped);
+            setBaseline(mapped);
         }
     }, [settingQuery.data]);
 
@@ -324,7 +332,7 @@ export default function SettingsScreen() {
         setActiveTab(tab);
     }, [activeTab, tabAnim]);
 
-    const isDirty = JSON.stringify(info) !== JSON.stringify(initialInfo);
+    const isDirty = JSON.stringify(info) !== JSON.stringify(baseline);
 
     const handleLogout = async () => {
         await signOut();
@@ -343,8 +351,28 @@ export default function SettingsScreen() {
             },
             {
                 onSuccess: () => {
+                    setBaseline(info);
                     setEditing(false);
                 },
+            },
+        );
+    };
+
+    const handleChangePassword = () => {
+        setPwError('');
+        setPwSuccess(false);
+        if (!currentPw) { setPwError('Current password is required'); return; }
+        if (newPw.length < 8) { setPwError('New password must be at least 8 characters'); return; }
+        if (newPw !== confirmPw) { setPwError('Passwords do not match'); return; }
+        changePasswordMutation.mutate(
+            { password: currentPw, new_password: newPw, new_password_confirmation: confirmPw },
+            {
+                onSuccess: () => {
+                    setPwSuccess(true);
+                    setCurrentPw(''); setNewPw(''); setConfirmPw('');
+                    setPwOpen(false);
+                },
+                onError: (err) => setPwError(err.message),
             },
         );
     };
@@ -474,7 +502,6 @@ export default function SettingsScreen() {
                                         { key: 'phone' as const, label: 'Phone Number', icon: <PhoneIcon /> },
                                         { key: 'dob' as const, label: 'Date Of Birth', icon: <CalendarIcon /> },
                                         { key: 'nationalId' as const, label: 'National ID', icon: <HashIcon /> },
-                                        { key: 'yearsOfExperience' as const, label: 'Years Of Experience', icon: <ClockIcon /> },
                                     ] as const).map((field, i) => (
                                         <View key={field.key}>
                                             {i > 0 && <Divider />}
@@ -488,7 +515,7 @@ export default function SettingsScreen() {
                                                         <RNTextInput
                                                             value={info[field.key]}
                                                             onChangeText={updateField(field.key)}
-                                                            keyboardType={field.key === 'yearsOfExperience' || field.key === 'phone' || field.key === 'nationalId' ? 'numeric' : 'default'}
+                                                            keyboardType={field.key === 'phone' || field.key === 'nationalId' ? 'numeric' : 'default'}
                                                             style={{
                                                                 fontSize: 15,
                                                                 fontFamily: 'IBMPlexSans_500Medium',
@@ -514,7 +541,7 @@ export default function SettingsScreen() {
                                 {editing ? (
                                     <View style={{ flexDirection: 'row', gap: 12 }}>
                                         <Pressable
-                                            onPress={() => { setInfo(initialInfo); setEditing(false); }}
+                                            onPress={() => { setInfo(baseline); setEditing(false); }}
                                             style={({ pressed }) => ({
                                                 flex: 1,
                                                 height: 48,
@@ -564,6 +591,64 @@ export default function SettingsScreen() {
                                     </Pressable>
                                 )}
                             </View>
+
+                            <SectionCard title="Security">
+                                <Pressable
+                                    onPress={() => { setPwOpen((v) => !v); setPwError(''); setPwSuccess(false); }}
+                                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}
+                                >
+                                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: AppColors.primary + '10', alignItems: 'center', justifyContent: 'center' }}>
+                                        <LockIcon />
+                                    </View>
+                                    <Text style={{ flex: 1, marginLeft: 12, fontSize: 14, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>Change Password</Text>
+                                    <Text style={{ fontSize: 18, color: '#9CA3AF' }}>{pwOpen ? '−' : '+'}</Text>
+                                </Pressable>
+                                {pwOpen && (
+                                    <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
+                                        <RNTextInput
+                                            value={currentPw}
+                                            onChangeText={setCurrentPw}
+                                            placeholder="Current password"
+                                            placeholderTextColor="#9CA3AF"
+                                            secureTextEntry
+                                            style={{ height: 44, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: AppColors.textPrimary }}
+                                        />
+                                        <RNTextInput
+                                            value={newPw}
+                                            onChangeText={setNewPw}
+                                            placeholder="New password (min 8 chars)"
+                                            placeholderTextColor="#9CA3AF"
+                                            secureTextEntry
+                                            style={{ height: 44, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: AppColors.textPrimary }}
+                                        />
+                                        <RNTextInput
+                                            value={confirmPw}
+                                            onChangeText={setConfirmPw}
+                                            placeholder="Confirm new password"
+                                            placeholderTextColor="#9CA3AF"
+                                            secureTextEntry
+                                            style={{ height: 44, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: AppColors.textPrimary }}
+                                        />
+                                        {pwError ? (
+                                            <Text style={{ ...Typography.bodySmall, color: AppColors.error }}>{pwError}</Text>
+                                        ) : null}
+                                        {pwSuccess ? (
+                                            <Text style={{ ...Typography.bodySmall, color: AppColors.success }}>Password changed successfully.</Text>
+                                        ) : null}
+                                        <Pressable
+                                            onPress={handleChangePassword}
+                                            disabled={changePasswordMutation.isPending}
+                                            style={({ pressed }) => ({ height: 46, borderRadius: 12, backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary, alignItems: 'center', justifyContent: 'center' })}
+                                        >
+                                            {changePasswordMutation.isPending ? (
+                                                <ActivityIndicator color={AppColors.white} />
+                                            ) : (
+                                                <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Update Password</Text>
+                                            )}
+                                        </Pressable>
+                                    </View>
+                                )}
+                            </SectionCard>
                         </>
                     )}
 
@@ -594,10 +679,6 @@ export default function SettingsScreen() {
                                 />
                                 <Divider />
                                 <MenuRow icon={<DatabaseIcon />} label="Data & Storage" />
-                            </SectionCard>
-
-                            <SectionCard title="Security">
-                                <MenuRow icon={<LockIcon />} label="Change Password" />
                             </SectionCard>
 
                             <SectionCard title="Support">
@@ -633,7 +714,7 @@ export default function SettingsScreen() {
                 <DiscardChangesModal
                     visible={showDiscard}
                     onCancel={() => setShowDiscard(false)}
-                    onDiscard={() => { setShowDiscard(false); setInfo(initialInfo); setEditing(false); }}
+                    onDiscard={() => { setShowDiscard(false); setInfo(baseline); setEditing(false); }}
                 />
             </TabSlideIn>
         </View>
