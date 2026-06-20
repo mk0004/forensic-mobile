@@ -172,15 +172,6 @@ interface Article {
     serverComments?: FeedComment[];
 }
 
-// trendingTopics stays static: the feed payload carries no topic/tag data.
-const trendingTopics = [
-    { tag: '#DNA Analysis', posts: 128 },
-    { tag: '#Toxicology', posts: 94 },
-    { tag: '#Crime Scene', posts: 76 },
-    { tag: '#Digital Forensics', posts: 63 },
-    { tag: '#Cold Cases', posts: 51 },
-];
-
 // Deterministic avatar color derived from the author name (server gives no color).
 const AVATAR_PALETTE = ['#D4A574', '#8B6F5C', '#A0522D', '#6B8E8E', '#4682B4', '#5B8C5A', '#8B5E83', '#C4A35A'];
 function avatarColorFor(seed: string): string {
@@ -344,28 +335,20 @@ export default function CommunityScreen() {
     const addCommentFeed = useAddCommentFeedMutation();
     const addCommentArticle = useAddCommentArticleMutation();
 
-    const feedItems = useMemo(() => feedQuery.data ?? [], [feedQuery.data]);
+    const buckets = feedQuery.data ?? { posts: [], publications: [], myPosts: [] };
     const itemById = useMemo(() => {
         const map = new Map<string, FeedItem>();
-        for (const item of feedItems) map.set(String(item.id), item);
+        for (const item of [...buckets.posts, ...buckets.publications, ...buckets.myPosts]) {
+            map.set(String(item.id), item);
+        }
         return map;
-    }, [feedItems]);
+    }, [buckets.posts, buckets.publications, buckets.myPosts]);
 
-    // The server feed is one list; derive the three tabs from it. Posts =
-    // non-article items, Publications = article items, My Posts = same articles
-    // (the backend has no per-user filter exposed here — verify on first 200).
-    const livePosts = useMemo<Post[]>(
-        () => feedItems.filter(i => !isArticleItem(i)).map(feedItemToPost),
-        [feedItems],
-    );
-    const liveArticles = useMemo<Article[]>(
-        () => feedItems.filter(isArticleItem).map(feedItemToArticle),
-        [feedItems],
-    );
-
-    const feedPosts: Post[] = livePosts;
-    const feedPublications: Article[] = liveArticles;
-    const feedMyPosts: Article[] = liveArticles;
+    // Each tab is driven by its own server bucket: Feed = public_feed,
+    // Publications = publication, My Posts = my_publications.
+    const feedPosts = useMemo<Post[]>(() => buckets.posts.map(feedItemToPost), [buckets.posts]);
+    const feedPublications = useMemo<Article[]>(() => buckets.publications.map(feedItemToArticle), [buckets.publications]);
+    const feedMyPosts = useMemo<Article[]>(() => buckets.myPosts.map(feedItemToArticle), [buckets.myPosts]);
 
     // Interactive state
     const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
@@ -530,33 +513,7 @@ export default function CommunityScreen() {
                             </View>
                         </View>
 
-                        {/* Trending topics */}
-                        <View style={{ paddingTop: 14 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 10 }}>
-                                <TrendUpIcon />
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Trending Now</Text>
-                            </View>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                                {trendingTopics.map((topic, i) => (
-                                    <Pressable
-                                        key={topic.tag}
-                                        style={({ pressed }) => ({
-                                            backgroundColor: pressed ? AppColors.primary + '12' : AppColors.white,
-                                            borderRadius: 12,
-                                            borderWidth: 1,
-                                            borderColor: '#E5E7EB',
-                                            paddingHorizontal: 14,
-                                            paddingVertical: 10,
-                                            minWidth: 110,
-                                            marginRight: i < trendingTopics.length - 1 ? 8 : 0,
-                                        })}
-                                    >
-                                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>{topic.tag}</Text>
-                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', marginTop: 3 }}>{topic.posts} posts</Text>
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        </View>
+
 
                         {/* Posts */}
                         <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>

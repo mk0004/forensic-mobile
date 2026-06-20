@@ -82,13 +82,38 @@ export function isArticleItem(item: FeedItem): boolean {
   return typeof item.title === 'string' && item.title.trim().length > 0;
 }
 
+export interface FeedBuckets {
+  posts: FeedItem[];
+  publications: FeedItem[];
+  myPosts: FeedItem[];
+}
+
+// The live feed groups items server-side into public_feed / publication /
+// my_publications. Read each bucket directly instead of flattening.
+function nestedList(data: unknown, key: string): FeedItem[] {
+  if (!data || typeof data !== 'object') return [];
+  const bucket = (data as Record<string, unknown>)[key];
+  if (bucket && typeof bucket === 'object' && Array.isArray((bucket as { data?: unknown }).data)) {
+    return (bucket as { data: FeedItem[] }).data;
+  }
+  return [];
+}
+
 export function useFeedQuery() {
-  return useQuery({
+  return useQuery<FeedBuckets>({
     queryKey: FEED_QUERY_KEY,
     queryFn: async () => {
       const resp = await authFetch<unknown>(RAILWAY_ENDPOINTS.feed);
-      // verify on first 200 — confirm the feed item shape & author/comment nesting.
-      return unwrapList<FeedItem>(resp);
+      const data = (resp as { data?: unknown })?.data;
+      const posts = nestedList(data, 'public_feed');
+      const publications = nestedList(data, 'publication');
+      const myPosts = nestedList(data, 'my_publications');
+      // Fallback: if the server returned a flat list, treat it all as posts.
+      if (posts.length === 0 && publications.length === 0 && myPosts.length === 0) {
+        const flat = unwrapList<FeedItem>(resp);
+        return { posts: flat, publications: [], myPosts: [] };
+      }
+      return { posts, publications, myPosts };
     },
   });
 }
