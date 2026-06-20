@@ -1,6 +1,13 @@
 import { RAILWAY_API_BASE_URL } from '@/constants/railway-api';
 import { getToken, removeToken } from '@/lib/auth-storage';
 
+// Registered by the auth context so a 401 anywhere can flip the app back to the
+// login screen instead of leaving the user stuck on an "Unauthenticated" error.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public status: number, public body?: string) {
     super(message);
@@ -48,6 +55,7 @@ export async function authFetch<T>(path: string, opts?: AuthFetchOptions): Promi
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   };
 
   let body: BodyInit | undefined;
@@ -73,6 +81,7 @@ export async function authFetch<T>(path: string, opts?: AuthFetchOptions): Promi
     const text = await res.text().catch(() => '');
     if (res.status === 401) {
       await removeToken();
+      onUnauthorized?.();
     }
     throw new ApiError(getApiErrorMessage(res.status, text), res.status, text);
   }

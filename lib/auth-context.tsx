@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { authFetch } from '@/lib/api-client';
+import { authFetch, setUnauthorizedHandler } from '@/lib/api-client';
 import { RAILWAY_ENDPOINTS } from '@/constants/railway-api';
 import {
   getToken,
@@ -47,6 +47,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    // On any 401, drop the session and return to login (no refresh endpoint exists).
+    setUnauthorizedHandler(() => {
+      void clearStoredUser();
+      setTokenState(null);
+      setUser(null);
+      setStatus('guest');
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const signIn = async (nextToken: string, nextUser: User): Promise<void> => {

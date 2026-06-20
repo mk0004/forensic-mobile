@@ -39,8 +39,10 @@ export function useSaveAsEvidenceMutation() {
     mutationFn: (payload: SaveAsEvidenceRequest) =>
       authFetch<Evidence>(RAILWAY_ENDPOINTS.saveAsEvidence, { method: 'POST', json: payload }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: EVIDENCE_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      // refetchType:'all' forces even unmounted case-detail queries to refresh,
+      // so returning to a case after adding evidence shows it immediately.
+      queryClient.invalidateQueries({ queryKey: EVIDENCE_QUERY_KEY, refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['cases'], refetchType: 'all' });
     },
   });
 }
