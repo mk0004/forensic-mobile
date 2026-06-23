@@ -2,14 +2,15 @@ import { Redirect } from 'expo-router';
 import { useAuth } from '@/lib/auth-context';
 
 export default function Index() {
-    const { status } = useAuth();
+    const { status, user } = useAuth();
 
     if (status === 'loading') {
         return null;
     }
 
     if (status === 'authed') {
-        return <Redirect href="/(doctor)/(tabs)" />;
+        const isAdmin = (user?.role ?? '').toLowerCase() === 'admin';
+        return <Redirect href={isAdmin ? '/(admin)' : '/(doctor)/(tabs)'} />;
     }
 
     return <Redirect href="/(auth)/splash" />;

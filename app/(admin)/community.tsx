@@ -19,13 +19,24 @@ const TABS: { key: Tab; label: string }[] = [
     { key: 'comments', label: 'Comments' },
 ];
 
-interface Row { id: string; rawId: number; kind: Tab; title: string; author?: string; icon: 'document-text-outline' | 'megaphone-outline' | 'chatbubble-outline' }
+interface Row {
+    id: string;
+    rawId: number;
+    kind: Tab;
+    title: string;
+    body?: string;
+    author?: string;
+    icon: 'document-text-outline' | 'megaphone-outline' | 'chatbubble-outline';
+}
+
+const KIND_LABEL: Record<Tab, string> = { articles: 'Article', feeds: 'Feed', comments: 'Comment' };
 
 export default function CommunityModeration() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [tab, setTab] = useState<Tab>('articles');
     const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+    const [previewTarget, setPreviewTarget] = useState<Row | null>(null);
 
     const articlesInf = useAdminCommunityArticlesInfinite();
     const feedsInf = useAdminCommunityFeedsInfinite();
@@ -37,10 +48,10 @@ export default function CommunityModeration() {
     const query = active.query;
 
     const rows: Row[] = tab === 'articles'
-        ? articlesInf.items.map((a) => ({ id: `a-${a.id}`, rawId: a.id, kind: 'articles' as const, title: a.title ?? 'Untitled article', author: a.user?.name, icon: 'document-text-outline' as const }))
+        ? articlesInf.items.map((a) => ({ id: `a-${a.id}`, rawId: a.id, kind: 'articles' as const, title: a.title ?? 'Untitled article', body: a.content, author: a.user?.name, icon: 'document-text-outline' as const }))
         : tab === 'feeds'
-            ? feedsInf.items.map((f) => ({ id: `f-${f.id}`, rawId: f.id, kind: 'feeds' as const, title: f.content ?? 'No content', author: f.user?.name, icon: 'megaphone-outline' as const }))
-            : commentsInf.items.map((c) => ({ id: `c-${c.id}`, rawId: c.id, kind: 'comments' as const, title: c.comment ?? 'No content', author: c.user?.name, icon: 'chatbubble-outline' as const }));
+            ? feedsInf.items.map((f) => ({ id: `f-${f.id}`, rawId: f.id, kind: 'feeds' as const, title: f.content ?? 'No content', body: f.content, author: f.user?.name, icon: 'megaphone-outline' as const }))
+            : commentsInf.items.map((c) => ({ id: `c-${c.id}`, rawId: c.id, kind: 'comments' as const, title: c.comment ?? 'No content', body: c.comment, author: c.user?.name, icon: 'chatbubble-outline' as const }));
 
     const confirmDelete = () => {
         if (!deleteTarget) return;
@@ -86,7 +97,7 @@ export default function CommunityModeration() {
                 ) : (
                     <>
                         {rows.map((r) => (
-                            <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: AppColors.white, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 14 }}>
+                            <Pressable key={r.id} onPress={() => setPreviewTarget(r)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: pressed ? '#F8FAFC' : AppColors.white, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 14 })}>
                                 <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: AppColors.primary + '12', alignItems: 'center', justifyContent: 'center' }}>
                                     <Ionicons name={r.icon} size={18} color={AppColors.primary} />
                                 </View>
@@ -97,7 +108,8 @@ export default function CommunityModeration() {
                                 <Pressable onPress={() => setDeleteTarget(r)} hitSlop={8} style={{ padding: 4 }}>
                                     <Ionicons name="trash-outline" size={18} color={AppColors.error} />
                                 </Pressable>
-                            </View>
+                                <Ionicons name="chevron-forward" size={16} color="#C4C9D4" />
+                            </Pressable>
                         ))}
                         {query.hasNextPage && (
                             <Pressable onPress={() => query.fetchNextPage()} disabled={query.isFetchingNextPage} style={({ pressed }) => ({ marginTop: 4, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? '#F3F4F6' : AppColors.white })}>
@@ -123,6 +135,51 @@ export default function CommunityModeration() {
                                 <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Cancel</Text>
                             </Pressable>
                             <Pressable onPress={confirmDelete} style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? '#B91C1C' : AppColors.error })}>
+                                <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Delete</Text>
+                            </Pressable>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* Preview */}
+            <Modal visible={!!previewTarget} transparent animationType="slide" onRequestClose={() => setPreviewTarget(null)}>
+                <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }} onPress={() => setPreviewTarget(null)}>
+                    <Pressable onPress={(e) => e.stopPropagation()} style={{ backgroundColor: AppColors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, paddingBottom: insets.bottom + 16, paddingHorizontal: Spacing.md, maxHeight: '80%' }}>
+                        <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB' }} />
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: AppColors.primary + '12', alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name={previewTarget?.icon ?? 'document-text-outline'} size={20} color={AppColors.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    {previewTarget ? KIND_LABEL[previewTarget.kind] : ''}
+                                </Text>
+                                {!!previewTarget?.author && <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: '#6B7280' }}>by {previewTarget.author}</Text>}
+                            </View>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {previewTarget?.kind === 'articles' && (
+                                <Text style={{ fontSize: 18, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary, marginBottom: 10 }}>{previewTarget.title}</Text>
+                            )}
+                            <Text selectable style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: AppColors.textPrimary, lineHeight: 22 }}>
+                                {previewTarget?.body || previewTarget?.title || 'No content'}
+                            </Text>
+                        </ScrollView>
+
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                            <Pressable onPress={() => setPreviewTarget(null)} style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? '#F3F4F6' : AppColors.white })}>
+                                <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>Close</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => { const t = previewTarget; setPreviewTarget(null); setDeleteTarget(t); }}
+                                style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: pressed ? '#B91C1C' : AppColors.error })}
+                            >
+                                <Ionicons name="trash-outline" size={16} color={AppColors.white} />
                                 <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Delete</Text>
                             </Pressable>
                         </View>

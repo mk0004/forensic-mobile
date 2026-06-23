@@ -304,6 +304,7 @@ export interface AdminCaseAudit {
 export interface AdminCommunityArticle {
   id: number;
   title?: string;
+  content?: string;
   user_id: number;
   user?: { id: number; name: string };
 }

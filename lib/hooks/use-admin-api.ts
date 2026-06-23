@@ -54,13 +54,16 @@ function flatten<T>(pages: InfinitePage<T>[] | undefined): T[] {
   return (pages ?? []).flatMap((p) => p.items);
 }
 
-function useAdminInfinite<T>(key: readonly unknown[], endpoint: string, pageParamName: string) {
+function useAdminInfinite<T>(key: readonly unknown[], endpoint: string, pageParamName: string, subKey?: string) {
   const query = useInfiniteQuery({
     queryKey: key,
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const resp = await authFetch<unknown>(buildUrl(endpoint, pageParamName, pageParam as number));
-      const paginator = (resp as { data?: Paginator<T> }).data;
+      const root = (resp as { data?: unknown }).data;
+      const paginator = (subKey
+        ? (root as Record<string, Paginator<T>> | undefined)?.[subKey]
+        : (root as Paginator<T> | undefined));
       return toInfinitePage<T>(paginator, pageParam as number);
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
@@ -93,15 +96,15 @@ export function useAdminCasesInfinite() {
 }
 
 export function useAdminCommunityArticlesInfinite() {
-  return useAdminInfinite<AdminCommunityArticle>(ADMIN_KEYS.communityArticles, RAILWAY_ENDPOINTS.adminCommunity, 'articles_page');
+  return useAdminInfinite<AdminCommunityArticle>(ADMIN_KEYS.communityArticles, RAILWAY_ENDPOINTS.adminCommunity, 'articles_page', 'articles');
 }
 
 export function useAdminCommunityFeedsInfinite() {
-  return useAdminInfinite<AdminCommunityFeed>(ADMIN_KEYS.communityFeeds, RAILWAY_ENDPOINTS.adminCommunity, 'feeds_page');
+  return useAdminInfinite<AdminCommunityFeed>(ADMIN_KEYS.communityFeeds, RAILWAY_ENDPOINTS.adminCommunity, 'feeds_page', 'feeds');
 }
 
 export function useAdminCommunityCommentsInfinite() {
-  return useAdminInfinite<AdminCommunityComment>(ADMIN_KEYS.communityComments, RAILWAY_ENDPOINTS.adminCommunity, 'comments_page');
+  return useAdminInfinite<AdminCommunityComment>(ADMIN_KEYS.communityComments, RAILWAY_ENDPOINTS.adminCommunity, 'comments_page', 'comments');
 }
 
 export function useAdminChatInfinite() {
