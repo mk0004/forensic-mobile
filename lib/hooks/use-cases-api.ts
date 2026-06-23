@@ -93,6 +93,42 @@ export function caseDisplayId(id: number | string): string {
   return `CASE-${id}`;
 }
 
+export function buildCaseContext(caseObj: CaseDetail): string {
+  const lines: string[] = [];
+  lines.push(`Case ${caseDisplayId(caseObj.id)}: ${caseObj.name || 'Untitled'}`);
+  if (caseObj.status) {
+    lines.push(`Status: ${caseObj.status}`);
+  }
+  if (caseObj.description) {
+    lines.push(`Description: ${caseObj.description}`);
+  }
+
+  const evidence = caseObj.evidence ?? [];
+  if (evidence.length > 0) {
+    lines.push(`Evidence (${evidence.length}):`);
+    evidence.forEach((ev, i) => {
+      const parts = [`${i + 1}. ${ev.name || 'Unnamed evidence'}`];
+      if (ev.model_used) {
+        parts.push(`[${ev.model_used}]`);
+      }
+      if (ev.data && typeof ev.data === 'object') {
+        const dataStr = Object.entries(ev.data)
+          .filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object')
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', ');
+        if (dataStr) {
+          parts.push(`(${dataStr})`);
+        }
+      }
+      lines.push(parts.join(' '));
+    });
+  } else {
+    lines.push('Evidence: none attached.');
+  }
+
+  return lines.join('\n');
+}
+
 export function useActiveCasesQuery() {
   return useQuery({
     queryKey: ['cases', 'active'],
@@ -163,8 +199,14 @@ export interface CreateCasePayload {
 export function useCreateCaseMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateCasePayload) =>
-      authFetch<Case>(RAILWAY_ENDPOINTS.createCase, { method: 'POST', json: payload }),
+    mutationFn: async (payload: CreateCasePayload) => {
+      const resp = await authFetch<unknown>(RAILWAY_ENDPOINTS.createCase, { method: 'POST', json: payload });
+      const created = unwrapObject<Case>(resp);
+      if (!created || created.id === undefined) {
+        throw new Error('Case was created but the server did not return its id.');
+      }
+      return toCase(created);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CASES_QUERY_KEY });
     },

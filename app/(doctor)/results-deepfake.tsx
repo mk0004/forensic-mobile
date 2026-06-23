@@ -50,12 +50,13 @@ function AlertCircle() {
 }
 
 /* ─── Confidence Ring ─── */
-function ConfidenceRing({ percentage, color }: { percentage: number; color: string }) {
+function ConfidenceRing({ percentage, color }: { percentage: number | null; color: string }) {
     const size = 120;
     const strokeWidth = 10;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    const progress = circumference - (percentage / 100) * circumference;
+    const hasValue = typeof percentage === 'number';
+    const progress = hasValue ? circumference - (percentage / 100) * circumference : circumference;
 
     return (
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -83,7 +84,7 @@ function ConfidenceRing({ percentage, color }: { percentage: number; color: stri
             </Svg>
             <View style={{ position: 'absolute', alignItems: 'center' }}>
                 <Text style={{ fontSize: 28, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary }}>
-                    {percentage.toFixed(1)}%
+                    {hasValue ? `${percentage.toFixed(1)}%` : 'N/A'}
                 </Text>
                 <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
                     Confidence
@@ -151,7 +152,7 @@ export default function ResultsDeepfakeScreen() {
                     typeof aiScore === 'number' ? aiScore : 0,
                     typeof f.score === 'number' ? f.score : 0
                 );
-                const confidence = normalizePercent(f.confidence ?? f.probability ?? strongestSignal) ?? (isReal ? 85 : 75);
+                const confidence = normalizePercent(f.confidence ?? f.probability ?? strongestSignal);
                 const faceRegion = f.facial_area || f.face_region || null;
                 return {
                     isReal,

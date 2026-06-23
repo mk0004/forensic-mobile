@@ -11,6 +11,7 @@ import { BottomDrawer } from '@/components/bottom-drawer';
 import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, ChevronRightIcon as ChevronRightModelIcon, SkipIcon } from '@/components/model-icons';
 import { useActiveCasesQuery } from '@/lib/hooks/use-cases-api';
 import { useSaveAsEvidenceMutation } from '@/lib/hooks/use-evidence-api';
+import { useAppToast } from '@/lib/error-toast';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -108,11 +109,11 @@ export default function UploadEvidence() {
     const params = useLocalSearchParams<{ caseId?: string }>();
     const { data: cases, isLoading: casesLoading } = useActiveCasesQuery();
     const saveEvidence = useSaveAsEvidenceMutation();
+    const { showError } = useAppToast();
+    const lockedCaseId = params.caseId ? Number(params.caseId) : null;
     const [evidenceName, setEvidenceName] = useState('');
     const [description, setDescription] = useState('');
-    const [selectedCaseId, setSelectedCaseId] = useState<number | null>(
-        params.caseId ? Number(params.caseId) : null,
-    );
+    const [selectedCaseId, setSelectedCaseId] = useState<number | null>(lockedCaseId);
     const [selectedModelKey, setSelectedModelKey] = useState<string>('');
     const [caseDropdownOpen, setCaseDropdownOpen] = useState(false);
     const [modelDrawerOpen, setModelDrawerOpen] = useState(false);
@@ -121,7 +122,9 @@ export default function UploadEvidence() {
     const [successDrawerVisible, setSuccessDrawerVisible] = useState(false);
 
     const caseOptions = (cases ?? []).map((c) => ({ id: c.id, label: `Case #${c.id} - ${c.name}` }));
-    const selectedCaseLabel = caseOptions.find((c) => c.id === selectedCaseId)?.label ?? '';
+    const selectedCaseLabel =
+        caseOptions.find((c) => c.id === selectedCaseId)?.label ??
+        (selectedCaseId !== null ? `Case #${selectedCaseId}` : '');
     const isDirty = evidenceName.length > 0 || description.length > 0 || selectedCaseId !== null || selectedModelKey.length > 0;
 
     const handleBack = () => {
@@ -165,14 +168,25 @@ export default function UploadEvidence() {
 
     const handleSubmit = () => {
         if (selectedCaseId === null) {
+            showError('Select a case before uploading evidence.');
             return;
         }
+        const trimmedName = evidenceName.trim();
+        if (!trimmedName) {
+            showError('Enter an evidence name.');
+            return;
+        }
+
+        const fileNames = files.map((f) => f.name);
         saveEvidence.mutate(
             {
-                name: evidenceName,
-                model_used: selectedModelKey,
+                name: trimmedName,
+                model_used: selectedModelKey || 'manual',
                 case_id: selectedCaseId,
-                data: description ? { description } : {},
+                data: {
+                    description: description.trim() || 'Manual evidence upload',
+                    ...(fileNames.length > 0 ? { files: fileNames } : {}),
+                },
             },
             {
                 onSuccess: () => setSuccessDrawerVisible(true),
@@ -344,10 +358,11 @@ export default function UploadEvidence() {
                                 Select Case
                             </Text>
                             <Pressable
-                                onPress={() => setCaseDropdownOpen(!caseDropdownOpen)}
+                                onPress={() => { if (lockedCaseId === null) setCaseDropdownOpen(!caseDropdownOpen); }}
+                                disabled={lockedCaseId !== null}
                                 style={{
                                     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                                    backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1,
+                                    backgroundColor: lockedCaseId !== null ? '#F3F4F6' : '#F9FAFB', borderRadius: 10, borderWidth: 1,
                                     borderColor: caseDropdownOpen ? AppColors.primary : '#E5E7EB',
                                     height: 48, paddingHorizontal: 14,
                                 }}
@@ -355,9 +370,9 @@ export default function UploadEvidence() {
                                 <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: selectedCaseLabel ? AppColors.textPrimary : '#D1D5DB' }}>
                                     {selectedCaseLabel || 'Choose a case'}
                                 </Text>
-                                <ChevronIcon />
+                                {lockedCaseId === null && <ChevronIcon />}
                             </Pressable>
-                            {caseDropdownOpen && (
+                            {lockedCaseId === null && caseDropdownOpen && (
                                 <View style={{
                                     position: 'absolute', top: 76, left: 0, right: 0,
                                     backgroundColor: AppColors.white, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB',

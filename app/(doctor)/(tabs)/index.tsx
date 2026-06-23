@@ -10,6 +10,11 @@ import { TabSlideIn } from '@/components/tab-slide-in';
 import { BottomDrawer } from '@/components/bottom-drawer';
 import { DeepFakeIcon, FaceIcon, DnaIcon, ReconstructIcon, ChevronRightIcon } from '@/components/model-icons';
 import { useDashboardQuery } from '@/lib/hooks/use-dashboard-api';
+import { useAllCasesQuery, caseDisplayId } from '@/lib/hooks/use-cases-api';
+import { useAuth } from '@/lib/auth-context';
+import { useSettingQuery } from '@/lib/hooks/use-auth-api';
+import { resolveImageUrl } from '@/constants/railway-api';
+import type { User, SettingResponse } from '@/types/api';
 
 interface RecentActivityRow {
     id: string;
@@ -34,6 +39,34 @@ interface NotificationRow {
 // backend provides one.
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+
+function resolveSettingUser(raw: User | SettingResponse | undefined): User | null {
+    if (!raw) {
+        return null;
+    }
+    const wrapped = raw as SettingResponse;
+    if (wrapped.data && typeof wrapped.data === 'object') {
+        return wrapped.data;
+    }
+    if (wrapped.user && typeof wrapped.user === 'object') {
+        return wrapped.user;
+    }
+    return raw as User;
+}
+
+function getInitials(name?: string): string {
+    if (!name) {
+        return 'U';
+    }
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+        return 'U';
+    }
+    if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 function BellIcon() {
     return (
@@ -156,6 +189,11 @@ export default function DoctorDashboard() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const swipeHandlers = useSwipeTabs(0);
+    const { user: authUser } = useAuth();
+    const settingQuery = useSettingQuery();
+    const currentUser = resolveSettingUser(settingQuery.data) ?? authUser;
+    const avatarImage = resolveImageUrl(currentUser?.image);
+    const avatarInitials = getInitials(currentUser?.name);
     const [drawerVisible, setDrawerVisible] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -166,7 +204,28 @@ export default function DoctorDashboard() {
     const activeCount = overview?.active_cases.total ?? 0;
     const evidenceCount = overview?.evidences.total ?? 0;
     const completedCount = overview?.completed_cases.total ?? 0;
-    const recentActivity: RecentActivityRow[] = [];
+
+    const newActiveCases = overview?.active_cases.new_this_week ?? 0;
+    const pendingEvidence = overview?.evidences.pending_review ?? 0;
+    const totalCases = activeCount + completedCount;
+    const completionRate = totalCases > 0 ? Math.round((completedCount / totalCases) * 100) : 0;
+
+    const allCasesQuery = useAllCasesQuery();
+    const recentActivity: RecentActivityRow[] = (allCasesQuery.data ?? [])
+        .slice()
+        .sort((a, b) => b.id - a.id)
+        .slice(0, 4)
+        .map((c) => {
+            const completed = ['complete', 'completed', 'closed', 'done'].includes((c.status ?? '').trim().toLowerCase());
+            return {
+                id: caseDisplayId(c.id),
+                title: c.name || 'Untitled case',
+                status: completed ? 'Completed' : 'Active',
+                statusColor: completed ? AppColors.success : AppColors.primary,
+                statusBg: completed ? '#DCFCE7' : AppColors.primary + '14',
+                updated: c.created_at ?? '',
+            };
+        });
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }} {...swipeHandlers}>
@@ -219,7 +278,9 @@ export default function DoctorDashboard() {
                                     </View>
                                 )}
                             </Pressable>
-                            <View
+                            <Pressable
+                                onPress={() => router.push('/(doctor)/(tabs)/settings')}
+                                hitSlop={8}
                                 style={{
                                     width: 36,
                                     height: 36,
@@ -227,12 +288,21 @@ export default function DoctorDashboard() {
                                     backgroundColor: AppColors.primary + '20',
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    overflow: 'hidden',
                                 }}
                             >
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
-                                    DR
-                                </Text>
-                            </View>
+                                {avatarImage ? (
+                                    <Image
+                                        source={{ uri: avatarImage }}
+                                        style={{ width: 36, height: 36, borderRadius: 18 }}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
+                                        {avatarInitials}
+                                    </Text>
+                                )}
+                            </Pressable>
                         </View>
                     </View>
 
@@ -256,12 +326,14 @@ export default function DoctorDashboard() {
                                 >
                                     <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>{activeCount}</Text>
                                     <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Active</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(99,204,255,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                        <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
-                                            <Path d="M12 19V5M5 12l7-7 7 7" stroke="#63CCFF" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-                                        </Svg>
-                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#63CCFF' }}>+3</Text>
-                                    </View>
+                                    {newActiveCases > 0 && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(99,204,255,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                            <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
+                                                <Path d="M12 19V5M5 12l7-7 7 7" stroke="#63CCFF" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+                                            </Svg>
+                                            <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#63CCFF' }}>+{newActiveCases}</Text>
+                                        </View>
+                                    )}
                                 </Pressable>
 
                                 <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 14 }} />
@@ -277,10 +349,12 @@ export default function DoctorDashboard() {
                                 >
                                     <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>{evidenceCount}</Text>
                                     <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Evidence</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(251,191,36,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#FBBF24' }} />
-                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#FBBF24' }}>20 new</Text>
-                                    </View>
+                                    {pendingEvidence > 0 && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(251,191,36,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#FBBF24' }} />
+                                            <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#FBBF24' }}>{pendingEvidence} pending</Text>
+                                        </View>
+                                    )}
                                 </Pressable>
 
                                 <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 14 }} />
@@ -296,12 +370,14 @@ export default function DoctorDashboard() {
                                 >
                                     <Text style={{ fontSize: 24, fontFamily: 'IBMPlexSans_700Bold', color: '#FFFFFF' }}>{completedCount}</Text>
                                     <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Completed</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(52,211,153,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                        <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
-                                            <Path d="M5 13l4 4L19 7" stroke="#34D399" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-                                        </Svg>
-                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#34D399' }}>80%</Text>
-                                    </View>
+                                    {totalCases > 0 && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: 'rgba(52,211,153,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                            <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
+                                                <Path d="M5 13l4 4L19 7" stroke="#34D399" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+                                            </Svg>
+                                            <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: '#34D399' }}>{completionRate}%</Text>
+                                        </View>
+                                    )}
                                 </Pressable>
                             </View>
                         </LinearGradient>
@@ -452,7 +528,7 @@ export default function DoctorDashboard() {
                             borderColor: '#E5E7EB',
                             overflow: 'hidden',
                         }}>
-                            {dashboardQuery.isPending ? (
+                            {allCasesQuery.isPending ? (
                                 <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center' }}>
                                     <ActivityIndicator color={AppColors.primary} />
                                 </View>
@@ -471,7 +547,7 @@ export default function DoctorDashboard() {
                                         key={item.id}
                                         onPress={() => router.push({
                                             pathname: '/(doctor)/case-details' as any,
-                                            params: { id: item.id.replace('#', ''), title: item.title },
+                                            params: { caseId: item.id.replace('CASE-', ''), title: item.title },
                                         })}
                                         style={({ pressed }) => ({
                                             flexDirection: 'row',

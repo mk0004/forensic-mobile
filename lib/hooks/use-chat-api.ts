@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/api-client';
 import { RAILWAY_ENDPOINTS, RAILWAY_ROUTES } from '@/constants/railway-api';
-import type { ChatConversation, ChatMessage } from '@/types/api';
+import type { ChatConversation, ChatMessage, PubMedSource, TavilySource } from '@/types/api';
 
 // The Railway backend may wrap list payloads as `{ data: T[] }` or return the
 // array directly. `unwrapList` normalizes both shapes defensively.
@@ -45,103 +45,79 @@ export function useMessagesQuery(conversationId: number | string | null | undefi
 
 export interface SendMessagePayload {
   query: string;
-  // The conversation the message belongs to (used for cache invalidation).
   conversationId?: number | string | null;
+  caseContext?: string;
+  caseContextLabel?: string;
 }
 
-// The send endpoint's response shape is not fully known. The reply text may be
-// keyed as response/reply/message/answer/data, and a new conversation id may be
-// returned. Surface the raw payload plus the best-effort extracted reply.
 export interface SendMessageResult {
   reply: string;
   conversationId?: number | string;
-  raw: unknown;
+  pubmedSources: PubMedSource[];
+  tavilySources: TavilySource[];
+  warnings: string[];
 }
 
-// Defensively pull a human-readable reply string out of an unknown payload.
-// verify on first 200 (which key holds the assistant reply text).
-function extractReply(resp: unknown): string {
-  if (typeof resp === 'string') {
-    return resp;
-  }
-  if (resp && typeof resp === 'object') {
-    const obj = resp as Record<string, unknown>;
-    const candidateKeys = ['response', 'reply', 'message', 'answer', 'text', 'content'];
-    for (const key of candidateKeys) {
-      const value = obj[key];
-      if (typeof value === 'string' && value.trim().length > 0) {
-        return value;
-      }
-    }
-    // The reply may be nested under `data`.
-    const data = obj.data;
-    if (typeof data === 'string' && data.trim().length > 0) {
-      return data;
-    }
-    if (data && typeof data === 'object') {
-      const nested = extractReply(data);
-      if (nested.trim().length > 0) {
-        return nested;
-      }
-    }
-  }
-  return '';
+interface ChatSendResponse {
+  conversation_id?: number | string;
+  assistant_message?: ChatMessage;
 }
 
-// Defensively pull a new/current conversation id out of an unknown payload.
-// verify on first 200 (which key holds the conversation id).
-function extractConversationId(resp: unknown): number | string | undefined {
-  if (resp && typeof resp === 'object') {
-    const obj = resp as Record<string, unknown>;
-    const candidateKeys = ['conversation_id', 'conversationId', 'conversation', 'id'];
-    for (const key of candidateKeys) {
-      const value = obj[key];
-      if (typeof value === 'number' || typeof value === 'string') {
-        return value;
-      }
-      // `conversation` may itself be an object carrying the id.
-      if (value && typeof value === 'object') {
-        const innerId = (value as { id?: unknown }).id;
-        if (typeof innerId === 'number' || typeof innerId === 'string') {
-          return innerId;
-        }
-      }
-    }
-    const data = obj.data;
-    if (data && typeof data === 'object') {
-      return extractConversationId(data);
-    }
-  }
-  return undefined;
-}
-
-// POST /api/chat/send { query } -> the assistant reply.
 export function useSendMessageMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ query }: SendMessagePayload): Promise<SendMessageResult> => {
-      const resp = await authFetch<unknown>(RAILWAY_ENDPOINTS.chatSend, {
+    mutationFn: async ({ query, conversationId, caseContext, caseContextLabel }: SendMessagePayload): Promise<SendMessageResult> => {
+      const body: Record<string, unknown> = { query };
+      if (conversationId !== undefined && conversationId !== null && conversationId !== '') {
+        body.conversation_id = conversationId;
+      }
+      if (caseContext) {
+        body.case_context = caseContext;
+      }
+      if (caseContextLabel) {
+        body.case_context_label = caseContextLabel;
+      }
+      const resp = await authFetch<ChatSendResponse>(RAILWAY_ENDPOINTS.chatSend, {
         method: 'POST',
-        json: { query },
+        json: body,
       });
+      const meta = resp.assistant_message?.metadata ?? undefined;
       return {
-        reply: extractReply(resp),
-        conversationId: extractConversationId(resp),
-        raw: resp,
+        reply: resp.assistant_message?.content ?? '',
+        conversationId: resp.conversation_id,
+        pubmedSources: meta?.pubmed_sources ?? [],
+        tavilySources: meta?.tavily_sources ?? [],
+        warnings: meta?.warnings ?? [],
       };
     },
-    onSuccess: (_result, variables) => {
-      // A new conversation may have been created, so refresh the list.
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: CHAT_CONVERSATIONS_KEY });
-      if (
-        variables.conversationId !== undefined &&
-        variables.conversationId !== null &&
-        variables.conversationId !== ''
-      ) {
-        queryClient.invalidateQueries({
-          queryKey: ['chat', 'messages', variables.conversationId],
-        });
+      const id = result.conversationId ?? variables.conversationId;
+      if (id !== undefined && id !== null && id !== '') {
+        queryClient.invalidateQueries({ queryKey: ['chat', 'messages', id] });
       }
+    },
+  });
+}
+
+export function useDeleteConversationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number | string) =>
+      authFetch<unknown>(RAILWAY_ROUTES.deleteConversation(id), { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CHAT_CONVERSATIONS_KEY });
+    },
+  });
+}
+
+export function useRenameConversationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, title }: { id: number | string; title: string }) =>
+      authFetch<unknown>(RAILWAY_ROUTES.renameConversation(id), { method: 'PUT', json: { title } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CHAT_CONVERSATIONS_KEY });
     },
   });
 }

@@ -46,10 +46,14 @@ export default function AddCase() {
         if (isDirty) { setShowDiscard(true); } else { router.back(); }
     };
 
-    const handleCreate = () => {
+    const submitCase = (afterCreate: (caseId: number) => void) => {
         setErrorMessage(null);
         if (!user?.id) {
             setErrorMessage('You must be signed in to create a case.');
+            return;
+        }
+        if (!title.trim()) {
+            setErrorMessage('Enter a case title.');
             return;
         }
         createCase.mutate(
@@ -60,8 +64,8 @@ export default function AddCase() {
                 user_id: user.id,
             },
             {
-                onSuccess: () => {
-                    router.back();
+                onSuccess: (created) => {
+                    afterCreate(created.id);
                 },
                 onError: (err) => {
                     setErrorMessage(err instanceof ApiError ? err.message : 'Failed to create case. Please try again.');
@@ -69,6 +73,11 @@ export default function AddCase() {
             }
         );
     };
+
+    const handleCreate = () => submitCase(() => router.back());
+
+    const handleCreateAndAddEvidence = () =>
+        submitCase((caseId) => router.replace(`/(doctor)/upload-evidence?caseId=${caseId}`));
 
     const isCreating = createCase.isPending;
 
@@ -161,51 +170,30 @@ export default function AddCase() {
                             </View>
                         </View>
                         <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', lineHeight: 17 }}>
-                            Attach photos, documents, or capture new evidence directly from your camera.
+                            Save the case first, then attach photos, documents, or captured evidence on the next step.
                         </Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <Pressable
-                                onPress={() => router.push('/(doctor)/upload-evidence')}
-                                style={({ pressed }) => ({
-                                    flex: 1,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: pressed ? '#F3F4F6' : '#F9FAFB',
-                                    borderRadius: 10,
-                                    borderWidth: 1,
-                                    borderColor: '#E5E7EB',
-                                    paddingVertical: 12,
-                                    gap: 6,
-                                })}
-                            >
-                                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                                    <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke={AppColors.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                </Svg>
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.primary }}>Upload</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => router.push('/(doctor)/upload-evidence')}
-                                style={({ pressed }) => ({
-                                    flex: 1,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: pressed ? '#F3F4F6' : '#F9FAFB',
-                                    borderRadius: 10,
-                                    borderWidth: 1,
-                                    borderColor: '#E5E7EB',
-                                    paddingVertical: 12,
-                                    gap: 6,
-                                })}
-                            >
-                                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                                    <Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2v11z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                                    <Path d="M12 17a4 4 0 100-8 4 4 0 000 8z" stroke={AppColors.primary} strokeWidth={1.5} />
-                                </Svg>
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.primary }}>Capture</Text>
-                            </Pressable>
-                        </View>
+                        <Pressable
+                            onPress={handleCreateAndAddEvidence}
+                            disabled={!title.trim() || isCreating}
+                            style={({ pressed }) => ({
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: (!title.trim() || isCreating) ? '#F3F4F6' : (pressed ? '#EEF2FF' : '#F9FAFB'),
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: (!title.trim() || isCreating) ? '#E5E7EB' : AppColors.primary + '55',
+                                paddingVertical: 12,
+                                gap: 6,
+                            })}
+                        >
+                            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                                <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke={(!title.trim() || isCreating) ? '#9CA3AF' : AppColors.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            </Svg>
+                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: (!title.trim() || isCreating) ? '#9CA3AF' : AppColors.primary }}>
+                                Create Case & Add Evidence
+                            </Text>
+                        </Pressable>
                     </View>
 
                     {/* Error message */}

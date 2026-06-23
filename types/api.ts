@@ -6,6 +6,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  image?: string | null;
   phone_number?: string;
   date_of_birth?: string;
   national_id?: string;
@@ -127,12 +128,63 @@ export interface ChatConversation {
   updated_at?: string;
 }
 
+export interface ChatMessageMetadata {
+  language?: string;
+  used_pubmed?: boolean;
+  used_tavily?: boolean;
+  pubmed_query?: string | null;
+  pubmed_sources?: PubMedSource[];
+  tavily_sources?: TavilySource[];
+  warnings?: string[];
+  case_context_label?: string;
+}
+
 export interface ChatMessage {
   id: number;
   conversation_id?: number;
-  role?: string; // verify on first 200
-  content?: string; // verify on first 200
+  sender?: string; // 'user' | 'assistant'
+  role?: string; // legacy fallback
+  content?: string;
+  metadata?: ChatMessageMetadata | null;
   created_at?: string;
+}
+
+export interface ForensicAssistantRequest {
+  query: string;
+  case_context?: string | null;
+  language?: 'auto' | 'en' | 'ar';
+  include_tavily?: boolean | null;
+  max_pubmed_results?: number;
+  max_tavily_results?: number;
+}
+
+export interface PubMedSource {
+  pmid?: string;
+  title?: string;
+  authors?: string[];
+  doi?: string;
+  journal?: string;
+  publication_date?: string;
+  url?: string;
+  abstract_excerpt?: string;
+}
+
+export interface TavilySource {
+  title?: string;
+  url?: string;
+  content_excerpt?: string;
+  published_date?: string | null;
+  score?: number;
+}
+
+export interface ForensicAssistantResponse {
+  language?: string;
+  answer?: string;
+  used_pubmed?: boolean;
+  used_tavily?: boolean;
+  pubmed_sources?: PubMedSource[];
+  tavily_sources?: TavilySource[];
+  warnings?: string[];
 }
 
 export interface DashboardStat {
@@ -164,4 +216,138 @@ export interface SettingResponse {
   message?: string;
   user?: User; // some deployments return the user at top level
   data?: User; // the live API wraps the user under `data`
+}
+
+export interface Paginator<T> {
+  current_page: number;
+  data: T[];
+  last_page: number;
+  per_page: number;
+  total: number;
+  next_page_url: string | null;
+  prev_page_url: string | null;
+}
+
+export interface AdminStatistics {
+  total_doctors: number;
+  active_cases: number;
+  total_feeds_posts: number;
+}
+
+export interface AdminTopDoctor {
+  id: number;
+  name: string;
+  image?: string | null;
+  cases_count?: number;
+}
+
+export interface AdminChartPoint {
+  models: string;
+  total_used: number;
+}
+
+export interface AdminDashboardData {
+  statistics: AdminStatistics;
+  top_doctors: AdminTopDoctor[];
+  chart_data: AdminChartPoint[];
+}
+
+export interface AdminDoctor {
+  id: number;
+  name: string;
+  national_id?: string;
+  created_at?: string;
+  status?: string;
+}
+
+export interface AdminDoctorInfo {
+  id: number;
+  name: string;
+  image?: string | null;
+  email?: string;
+  national_id?: string;
+  total_cases: number;
+  total_articles: number;
+}
+
+export interface AdminDoctorCase {
+  id: number;
+  user_id: number;
+  status: string;
+  created_at?: string;
+  evidences_count: number;
+}
+
+export interface AdminDoctorArticle {
+  id: number;
+  user_id: number;
+  title?: string;
+  created_at?: string;
+  views_count?: number;
+}
+
+export interface AdminDoctorProfileData {
+  doctor_info: AdminDoctorInfo;
+  modals_data: {
+    cases_modal: Paginator<AdminDoctorCase>;
+    articles_modal: Paginator<AdminDoctorArticle>;
+  };
+}
+
+export interface AdminCaseAudit {
+  id: number;
+  user_id: number;
+  evidences_count: number;
+  user?: { id: number; name: string };
+}
+
+export interface AdminCommunityArticle {
+  id: number;
+  title?: string;
+  user_id: number;
+  user?: { id: number; name: string };
+}
+
+export interface AdminCommunityFeed {
+  id: number;
+  content?: string;
+  user_id: number;
+  user?: { id: number; name: string };
+}
+
+export interface AdminCommunityComment {
+  id: number;
+  comment?: string;
+  user_id: number;
+  user?: { id: number; name: string };
+}
+
+export interface AdminCommunityData {
+  articles: Paginator<AdminCommunityArticle>;
+  feeds: Paginator<AdminCommunityFeed>;
+  comments: Paginator<AdminCommunityComment>;
+}
+
+export interface AdminChatConversation {
+  id: number;
+  title?: string;
+  created_at?: string;
+  messages_count: number;
+}
+
+export interface AdminSystemLog {
+  id: number;
+  name?: string;
+  massage?: string;
+  created_at?: string;
+}
+
+export interface AdminGlobalReport {
+  metadata: { period: string; generated_at: string };
+  data: {
+    user_activity: { name: string; role: string; updated_at: string }[];
+    case_statistics: { total: number; active: number; completed: number };
+    ai_performance: { models: string; usage_count: number }[];
+    community_engagement: { articles: number; feeds: number; comments: number };
+  };
 }

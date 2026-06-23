@@ -1,11 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
-import { Tabs } from 'expo-router';
-import { View, Pressable, Text, Dimensions, Animated, TextInput as RNTextInput, Keyboard } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRef } from 'react';
+import { Tabs, useRouter } from 'expo-router';
+import { View, Pressable, Text, Dimensions, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle as SvgCircle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { AppColors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -150,125 +148,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const paddingBottom = Math.max(insets.bottom, 12);
     const containerH = FAB_OVERLAP + CURVE_DEPTH + CONTENT_HEIGHT + paddingBottom;
 
-    // Panel target dimensions
-    const PANEL_WIDTH = SCREEN_WIDTH - 32;
-    const PANEL_HEIGHT = 260;
-    const PANEL_LEFT = 16;
-    const PANEL_BOTTOM = CURVE_DEPTH + CONTENT_HEIGHT + paddingBottom + 4;
-    // FAB center position relative to container
-    const FAB_LEFT = SCREEN_WIDTH / 2 - FAB_SIZE / 2;
-    const FAB_BOTTOM_OFFSET = containerH - FAB_SIZE; // distance from container bottom to FAB top
-
-    // Chat state
-    const [chatExpanded, setChatExpanded] = useState(false);
-    const [chatInput, setChatInput] = useState('');
-    const [isThinking, setIsThinking] = useState(false);
-    const inputRef = useRef<RNTextInput>(null);
-
-    // Morph animation (0 = FAB, 1 = expanded panel)
-    const morphProgress = useRef(new Animated.Value(0)).current;
-    // Thinking dots
-    const dot1 = useRef(new Animated.Value(0.3)).current;
-    const dot2 = useRef(new Animated.Value(0.3)).current;
-    const dot3 = useRef(new Animated.Value(0.3)).current;
-    // Keyboard offset (native driver — won't steal focus)
-    const keyboardTranslateY = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
-            if (!chatExpanded) return;
-            Animated.spring(keyboardTranslateY, {
-                toValue: -(e.endCoordinates.height - containerH + 20),
-                useNativeDriver: true,
-                damping: 18,
-                stiffness: 200,
-            }).start();
-        });
-        const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-            Animated.spring(keyboardTranslateY, {
-                toValue: 0,
-                useNativeDriver: true,
-                damping: 18,
-                stiffness: 200,
-            }).start();
-        });
-        return () => { showSub.remove(); hideSub.remove(); };
-    }, [chatExpanded]);
-
-    const startThinkingDots = () => {
-        const make = (d: Animated.Value, delay: number) =>
-            Animated.loop(Animated.sequence([
-                Animated.delay(delay),
-                Animated.timing(d, { toValue: 1, duration: 350, useNativeDriver: false }),
-                Animated.timing(d, { toValue: 0.3, duration: 350, useNativeDriver: false }),
-            ]));
-        Animated.parallel([make(dot1, 0), make(dot2, 150), make(dot3, 300)]).start();
-    };
-
-    const stopThinkingDots = () => {
-        dot1.stopAnimation(); dot2.stopAnimation(); dot3.stopAnimation();
-        dot1.setValue(0.3); dot2.setValue(0.3); dot3.setValue(0.3);
-    };
-
-    const expandFab = () => {
-        setChatExpanded(true);
-        if (process.env.EXPO_OS === 'ios') {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-        Animated.spring(morphProgress, {
-            toValue: 1,
-            useNativeDriver: false,
-            damping: 18,
-            stiffness: 180,
-        }).start(() => {
-            inputRef.current?.focus();
-        });
-    };
-
-    const collapseFab = () => {
-        Keyboard.dismiss();
-        keyboardTranslateY.setValue(0);
-        setChatInput('');
-        Animated.spring(morphProgress, {
-            toValue: 0,
-            useNativeDriver: false,
-            damping: 18,
-            stiffness: 180,
-        }).start(() => setChatExpanded(false));
-    };
-
-    const submitChat = (override?: string) => {
-        const q = (override || chatInput).trim();
-        if (q) {
-            Keyboard.dismiss();
-            setIsThinking(true);
-            startThinkingDots();
-
-            setTimeout(() => {
-                stopThinkingDots();
-                setIsThinking(false);
-                setChatInput('');
-                Animated.spring(morphProgress, {
-                    toValue: 0,
-                    useNativeDriver: false,
-                    damping: 18,
-                    stiffness: 180,
-                }).start(() => {
-                    setChatExpanded(false);
-                    router.push({ pathname: '/(doctor)/ai-chat', params: { q } } as any);
-                });
-            }, 2500);
-        }
-    };
-
-    // Interpolated morph values
-    const animWidth = morphProgress.interpolate({ inputRange: [0, 1], outputRange: [FAB_SIZE, PANEL_WIDTH] });
-    const animHeight = morphProgress.interpolate({ inputRange: [0, 1], outputRange: [FAB_SIZE, PANEL_HEIGHT] });
-    const animLeft = morphProgress.interpolate({ inputRange: [0, 1], outputRange: [FAB_LEFT, PANEL_LEFT] });
-    const animBottom = morphProgress.interpolate({ inputRange: [0, 1], outputRange: [FAB_BOTTOM_OFFSET, PANEL_BOTTOM] });
-    const animBorderRadius = morphProgress.interpolate({ inputRange: [0, 1], outputRange: [FAB_SIZE / 2, 16] });
-    const contentOpacity = morphProgress.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
-    const fabIconOpacity = morphProgress.interpolate({ inputRange: [0, 0.4], outputRange: [1, 0], extrapolate: 'clamp' });
+    const fabScale = useRef(new Animated.Value(1)).current;
 
     const icons: Record<string, (color: string) => React.ReactNode> = {
         index: (color) => <DashboardIcon color={color} />,
@@ -318,15 +198,23 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const leftTabs = state.routes.filter(r => r.name === 'index' || r.name === 'explore');
     const rightTabs = state.routes.filter(r => r.name === 'community' || r.name === 'settings');
 
-    const screenH = Dimensions.get('window').height;
+    const openAiChat = () => {
+        if (process.env.EXPO_OS === 'ios') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+        Animated.sequence([
+            Animated.spring(fabScale, { toValue: 0.88, useNativeDriver: true, damping: 12, stiffness: 400 }),
+            Animated.spring(fabScale, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 400 }),
+        ]).start();
+        router.push('/(doctor)/ai-chat');
+    };
+
+    const FAB_BOTTOM_OFFSET = containerH - FAB_SIZE;
+    const FAB_LEFT = SCREEN_WIDTH / 2 - FAB_SIZE / 2;
 
     return (
         <View
-            style={{
-                height: chatExpanded ? screenH : containerH,
-                marginTop: chatExpanded ? -(screenH - containerH) : 0,
-                backgroundColor: 'transparent',
-            }}
+            style={{ height: containerH, backgroundColor: 'transparent' }}
             pointerEvents="box-none"
         >
             {/* Tab bar background pinned to bottom */}
@@ -334,212 +222,33 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 <TabBarBackground />
             </View>
 
-            {/* Blur overlay when panel is expanded */}
-            {chatExpanded && (
-                <Animated.View
-                    pointerEvents="none"
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 10,
-                        opacity: morphProgress,
-                    }}
-                >
-                    <BlurView
-                        intensity={2}
-                        tint="dark"
-                        experimentalBlurMethod="dimezisBlurView"
-                        style={{ flex: 1 }}
-                    />
-                    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }} />
-                </Animated.View>
-            )}
-
-            {/* Keyboard offset wrapper */}
+            {/* Floating AI button */}
             <Animated.View
                 style={{
                     position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    top: 0,
+                    bottom: FAB_BOTTOM_OFFSET,
+                    left: FAB_LEFT,
+                    width: FAB_SIZE,
+                    height: FAB_SIZE,
+                    borderRadius: FAB_SIZE / 2,
                     zIndex: 20,
-                    transform: [{ translateY: keyboardTranslateY }],
+                    transform: [{ scale: fabScale }],
+                    boxShadow: '0 4px 14px rgba(30,42,94,0.45)',
                 }}
-                pointerEvents="box-none"
             >
-                {/* Morphing FAB → Panel */}
-                <Animated.View
-                    style={{
-                        position: 'absolute',
-                        bottom: animBottom,
-                        left: animLeft,
-                        width: animWidth,
-                        height: animHeight,
-                        borderRadius: animBorderRadius,
-                        overflow: 'hidden',
-                        zIndex: 20,
-                        shadowColor: '#6366F1',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 12,
-                        elevation: 10,
-                    }}
+                <Pressable
+                    onPress={openAiChat}
+                    style={{ flex: 1, borderRadius: FAB_SIZE / 2, overflow: 'hidden' }}
                 >
                     <LinearGradient
-                        colors={['#6366F1', '#1E2A5E']}
+                        colors={[AppColors.primaryHover, AppColors.primary]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                    />
-                    {/* White overlay that fades in when expanded */}
-                    <Animated.View style={{
-                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundColor: '#FFFFFF',
-                        opacity: morphProgress,
-                    }} />
-
-                    {/* Collapsed FAB icon */}
-                    <Animated.View
-                        style={{
-                            position: 'absolute',
-                            top: 0, left: 0, right: 0, bottom: 0,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            opacity: fabIconOpacity,
-                        }}
-                        pointerEvents={chatExpanded ? 'none' : 'auto'}
+                        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
                     >
-                        <Pressable
-                            onPress={expandFab}
-                            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' }}
-                        >
-                            <Ionicons name="sparkles" size={22} color="#FFFFFF" />
-                        </Pressable>
-                    </Animated.View>
-
-                    {/* Expanded panel content */}
-                    <Animated.View
-                        style={{
-                            flex: 1,
-                            opacity: contentOpacity,
-                            padding: 14,
-                        }}
-                        pointerEvents={chatExpanded ? 'auto' : 'none'}
-                    >
-                        {isThinking ? (
-                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                                <View style={{ flexDirection: 'row', gap: 5 }}>
-                                    {[dot1, dot2, dot3].map((d, i) => (
-                                        <Animated.View
-                                            key={i}
-                                            style={{
-                                                width: 7, height: 7, borderRadius: 3.5,
-                                                backgroundColor: '#6366F1',
-                                                opacity: d,
-                                                transform: [{ scale: d }],
-                                            }}
-                                        />
-                                    ))}
-                                </View>
-                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_500Medium', color: '#9CA3AF' }}>Analysing your request</Text>
-                            </View>
-                        ) : (
-                            <>
-                                {/* Input row */}
-                                <View style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    backgroundColor: AppColors.surface,
-                                    borderRadius: 10,
-                                    borderWidth: 1,
-                                    borderColor: '#6366F160',
-                                    paddingHorizontal: 12,
-                                    height: 42,
-                                    gap: 8,
-                                    shadowColor: '#6366F1',
-                                    shadowOffset: { width: 0, height: 0 },
-                                    shadowOpacity: 0.25,
-                                    shadowRadius: 10,
-                                    elevation: 4,
-                                }}>
-                                    <Ionicons name="sparkles" size={14} color={'#6366F1'} />
-                                    <RNTextInput
-                                        ref={inputRef}
-                                        value={chatInput}
-                                        onChangeText={setChatInput}
-                                        placeholder="Ask AI assistant..."
-                                        placeholderTextColor="#9CA3AF"
-                                        style={{
-                                            flex: 1,
-                                            fontSize: 13,
-                                            fontFamily: 'IBMPlexSans_400Regular',
-                                            color: AppColors.textPrimary,
-                                            height: 40,
-                                            padding: 0,
-                                        }}
-                                        returnKeyType="send"
-                                        onSubmitEditing={() => submitChat()}
-                                    />
-                                    {chatInput.trim() ? (
-                                        <Pressable onPress={() => submitChat()} hitSlop={6}>
-                                            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#6366F1', alignItems: 'center', justifyContent: 'center' }}>
-                                                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                                                    <Path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="#FFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                                </Svg>
-                                            </View>
-                                        </Pressable>
-                                    ) : (
-                                        <Pressable onPress={collapseFab} hitSlop={6}>
-                                            <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                <Ionicons name="close" size={14} color="#9CA3AF" />
-                                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_500Medium', color: '#9CA3AF' }}>Close</Text>
-                                            </View>
-                                        </Pressable>
-                                    )}
-                                </View>
-
-                                {/* Divider */}
-                                <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 10, marginHorizontal: -2 }} />
-
-                                {/* Suggestions */}
-                                <View style={{ gap: 2 }}>
-                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', marginBottom: 4 }}>Suggestions</Text>
-                                    {[
-                                        'Summarize active cases',
-                                        'Analyze Case #2024-0892',
-                                        'What evidence is missing?',
-                                    ].map((s) => (
-                                        <Pressable
-                                            key={s}
-                                            onPress={() => {
-                                                setChatInput(s);
-                                                inputRef.current?.focus();
-                                            }}
-                                            style={({ pressed }) => ({
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                gap: 8,
-                                                paddingVertical: 8,
-                                                paddingHorizontal: 10,
-                                                borderRadius: 8,
-                                                backgroundColor: pressed ? '#F3F4F6' : 'transparent',
-                                            })}
-                                        >
-                                            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                                                <Path d="M5 12h14M12 5l7 7-7 7" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                            </Svg>
-                                            <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#374151', flex: 1 }}>{s}</Text>
-                                        </Pressable>
-                                    ))}
-                                </View>
-                            </>
-                        )}
-                    </Animated.View>
-                </Animated.View>
+                        <Ionicons name="sparkles" size={22} color={AppColors.white} />
+                    </LinearGradient>
+                </Pressable>
             </Animated.View>
 
             {/* Tab items row pinned to bottom */}

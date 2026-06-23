@@ -5,6 +5,7 @@ export const DEEPFACE_ENDPOINTS = {
   deepfake: '/deepFake',
   forensicAnalysis: '/forensicAnalysis',
   dnaPhenotyping: '/dnaPhenotyping',
+  forensicAssistant: '/forensicAssistant',
 } as const;
 
 export const DEFAULT_DETECTOR_BACKEND = 'retinaface';

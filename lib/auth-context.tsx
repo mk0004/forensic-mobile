@@ -19,6 +19,16 @@ interface AuthContextValue {
   status: AuthStatus;
   signIn: (token: string, user: User) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+}
+
+function resolveSettingUser(raw: unknown): User | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const obj = raw as { data?: unknown; user?: unknown };
+  const candidate = (obj.data ?? obj.user ?? raw) as User;
+  return candidate && typeof candidate.email === 'string' ? candidate : null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -68,6 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authed');
   };
 
+  const refreshUser = async (): Promise<void> => {
+    try {
+      const resp = await authFetch<unknown>(RAILWAY_ENDPOINTS.setting, { method: 'GET' });
+      const fresh = resolveSettingUser(resp);
+      if (fresh) {
+        await setStoredUser(fresh);
+        setUser(fresh);
+      }
+    } catch {
+      void 0;
+    }
+  };
+
   const signOut = async (): Promise<void> => {
     try {
       await authFetch(RAILWAY_ENDPOINTS.logout, { method: 'POST' });
@@ -82,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, status, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, token, status, signIn, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

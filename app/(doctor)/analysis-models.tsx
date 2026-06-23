@@ -30,7 +30,7 @@ const analysisModels = [
         hasLaunch: true,
         modelType: 'deepfake',
         badge: 'Popular',
-        badgeColor: '#6366F1',
+        badgeColor: '#1E2A5E',
     },
     {
         title: 'Face Recognition',

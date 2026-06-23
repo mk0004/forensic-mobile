@@ -11,14 +11,21 @@ export type { DeleteEvidencePayload } from '@/lib/hooks/use-cases-api';
 
 export const EVIDENCE_QUERY_KEY = ['evidence'] as const;
 
-// The Railway backend may wrap list payloads as `{ data: T[] }` or return the
-// array directly. Normalize both shapes defensively.
 function unwrapList<T>(resp: unknown): T[] {
   if (Array.isArray(resp)) {
     return resp as T[];
   }
   if (resp && typeof resp === 'object' && Array.isArray((resp as { data?: unknown }).data)) {
     return (resp as { data: T[] }).data;
+  }
+  if (resp && typeof resp === 'object') {
+    const responseData = (resp as { data?: unknown }).data;
+    if (responseData && typeof responseData === 'object') {
+      const evidenceList = (responseData as { evidences_list?: unknown }).evidences_list;
+      if (Array.isArray(evidenceList)) {
+        return evidenceList as T[];
+      }
+    }
   }
   return [];
 }

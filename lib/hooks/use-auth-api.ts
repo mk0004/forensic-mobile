@@ -1,7 +1,18 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/api-client';
 import { RAILWAY_ENDPOINTS } from '@/constants/railway-api';
 import { LoginResponse, SettingResponse, User } from '@/types/api';
+
+interface UploadImageResult {
+  msg?: string;
+  image?: string;
+}
+
+interface UploadImageVariables {
+  uri: string;
+  mimeType?: string;
+  fileName?: string;
+}
 
 // The setting endpoint may return the user directly or wrapped under `user`.
 export type SettingResult = User | SettingResponse;
@@ -114,6 +125,30 @@ export function useSettingQuery() {
         method: 'GET',
         auth: true,
       }),
+  });
+}
+
+export function useUploadUserImageMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<UploadImageResult, Error, UploadImageVariables>({
+    mutationFn: ({ uri, mimeType, fileName }) => {
+      const formData = new FormData();
+      const inferredType = mimeType || 'image/jpeg';
+      const inferredName = fileName || `avatar.${inferredType.split('/')[1] || 'jpg'}`;
+      formData.append('image', {
+        uri,
+        type: inferredType,
+        name: inferredName,
+      } as unknown as Blob);
+      return authFetch<UploadImageResult>(RAILWAY_ENDPOINTS.uploadUserImage, {
+        method: 'POST',
+        formData,
+        auth: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['setting'] });
+    },
   });
 }
 

@@ -90,29 +90,23 @@ function ActiveDotIcon() {
     );
 }
 
-/* ─── AI Context Insights (mock) ─── */
-function getAIInsights(caseId: string, analyses: AnalysisEvidence[]) {
-    const hasDeepfake = analyses.some(a => a.modelType === 'deepfake');
-    const hasFace = analyses.some(a => a.modelType === 'face');
-    const hasFake = analyses.some(a => a.modelType === 'deepfake' && a.verdict.toLowerCase().includes('fake'));
-    const hasMatch = analyses.some(a => a.modelType === 'face' && a.verdict.toLowerCase().includes('match found'));
-
+function getAIInsights(analyses: AnalysisEvidence[]) {
     const insights: { text: string; type: 'info' | 'warning' | 'suggestion' }[] = [];
 
-    if (hasFake) {
-        insights.push({ text: 'Deepfake detected in evidence. Consider cross-referencing with original source material.', type: 'warning' });
-    }
-    if (hasMatch) {
-        insights.push({ text: 'Face match confirmed. Identity verification can be used to strengthen the case profile.', type: 'info' });
-    }
-    if (hasDeepfake && hasFace) {
-        insights.push({ text: 'Both deepfake and face analyses run. Consider running DNA phenotype for a comprehensive profile.', type: 'suggestion' });
-    }
     if (analyses.length === 0) {
-        insights.push({ text: 'No analyses yet. Start with a deepfake check or face recognition to build the evidence chain.', type: 'suggestion' });
+        return insights;
     }
-    if (analyses.length === 1) {
-        insights.push({ text: 'Only one analysis completed. Running additional models improves case confidence.', type: 'suggestion' });
+
+    const hasDeepfake = analyses.some(a => a.modelType === 'deepfake');
+    const hasFace = analyses.some(a => a.modelType === 'face');
+    const hasDna = analyses.some(a => a.modelType === 'dna');
+    const modelCount = new Set(analyses.map(a => a.modelType)).size;
+
+    if (hasDeepfake && hasFace && !hasDna) {
+        insights.push({ text: 'Deepfake and face analyses are attached. Running DNA phenotype would add a comprehensive profile.', type: 'suggestion' });
+    }
+    if (modelCount === 1) {
+        insights.push({ text: 'Only one analysis model has been run on this case. Additional models improve case confidence.', type: 'suggestion' });
     }
 
     return insights.slice(0, 2);
@@ -264,7 +258,7 @@ export default function CaseDetails() {
         }
     }
 
-    const aiInsights = getAIInsights(caseId, evidence.analyses);
+    const aiInsights = getAIInsights(evidence.analyses);
 
     return (
         <View style={{ flex: 1, backgroundColor: AppColors.surface }}>
@@ -293,6 +287,23 @@ export default function CaseDetails() {
                     <Text style={{ ...Typography.h5, color: AppColors.textPrimary, flex: 1 }}>
                         Case Details
                     </Text>
+                    <Pressable
+                        onPress={() => router.push({ pathname: '/(doctor)/ai-chat', params: { caseId: String(caseId) } })}
+                        hitSlop={8}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            height: 36,
+                            paddingHorizontal: 10,
+                            borderRadius: 10,
+                            backgroundColor: '#1E2A5E' + '12',
+                            marginRight: !isCompleted ? 8 : 0,
+                        }}
+                    >
+                        <Ionicons name="sparkles" size={14} color="#1E2A5E" />
+                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#1E2A5E' }}>Ask AI</Text>
+                    </Pressable>
                     {!isCompleted && (
                         <Pressable
                             onPress={() => setEditDrawerVisible(true)}
@@ -423,11 +434,11 @@ export default function CaseDetails() {
                                     width: 28,
                                     height: 28,
                                     borderRadius: 8,
-                                    backgroundColor: '#6366F1' + '12',
+                                    backgroundColor: '#1E2A5E' + '12',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                 }}>
-                                    <Ionicons name="sparkles" size={14} color="#6366F1" />
+                                    <Ionicons name="sparkles" size={14} color="#1E2A5E" />
                                 </View>
                                 <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
                                     AI Insights

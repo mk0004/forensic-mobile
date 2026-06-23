@@ -1,15 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, TextInput as RNTextInput, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, Pressable, Switch, TextInput as RNTextInput, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
 import { TabSlideIn } from '@/components/tab-slide-in';
 import { useAuth } from '@/lib/auth-context';
-import { useSettingQuery, useSaveChangeMutation, useChangePasswordMutation, SettingResult } from '@/lib/hooks/use-auth-api';
+import { useSettingQuery, useSaveChangeMutation, useChangePasswordMutation, useUploadUserImageMutation, SettingResult } from '@/lib/hooks/use-auth-api';
+import { useAppToast } from '@/lib/error-toast';
+import { resolveImageUrl } from '@/constants/railway-api';
 import { User, SettingResponse } from '@/types/api';
 
 /* ─── SVG Icons ─── */
@@ -290,13 +293,29 @@ function userToInfo(user: User): ProfileInfo {
     };
 }
 
+function getInitials(first: string, last: string): string {
+    const a = first.trim();
+    const b = last.trim();
+    if (!a && !b) return 'U';
+    if (a && b) return (a[0] + b[0]).toUpperCase();
+    const single = (a || b);
+    return single.slice(0, 2).toUpperCase();
+}
+
+function formatRole(role?: string): string {
+    if (!role) return 'Forensic Expert';
+    return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { signOut } = useAuth();
+    const { signOut, refreshUser } = useAuth();
     const settingQuery = useSettingQuery();
     const saveChangeMutation = useSaveChangeMutation();
     const changePasswordMutation = useChangePasswordMutation();
+    const uploadImageMutation = useUploadUserImageMutation();
+    const { showError, showSuccess } = useAppToast();
     const swipeHandlers = useSwipeTabs(3);
     const [pwOpen, setPwOpen] = useState(false);
     const [currentPw, setCurrentPw] = useState('');
@@ -310,6 +329,11 @@ export default function SettingsScreen() {
     const [baseline, setBaseline] = useState<ProfileInfo>(initialInfo);
     const [showDiscard, setShowDiscard] = useState(false);
     const [editing, setEditing] = useState(false);
+
+    const resolvedUser = settingQuery.data ? resolveUser(settingQuery.data) : null;
+    const avatarImage = resolveImageUrl(resolvedUser?.image);
+    const avatarInitials = getInitials(info.firstName, info.lastName);
+    const roleLabel = formatRole(resolvedUser?.role);
 
     useEffect(() => {
         if (!settingQuery.data) return;
@@ -339,6 +363,30 @@ export default function SettingsScreen() {
         router.replace('/(auth)/login');
     };
 
+    const handlePickAvatar = async () => {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+            showError('Photo library access is required to change your avatar.');
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+        if (result.canceled || !result.assets[0]) {
+            return;
+        }
+        const asset = result.assets[0];
+        uploadImageMutation.mutate(
+            { uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName ?? undefined },
+            {
+                onSuccess: () => showSuccess('Profile photo updated.'),
+            },
+        );
+    };
+
     const handleSave = () => {
         const name = `${info.firstName} ${info.lastName}`.trim();
         saveChangeMutation.mutate(
@@ -353,6 +401,8 @@ export default function SettingsScreen() {
                 onSuccess: () => {
                     setBaseline(info);
                     setEditing(false);
+                    settingQuery.refetch();
+                    refreshUser();
                 },
             },
         );
@@ -401,10 +451,16 @@ export default function SettingsScreen() {
                         style={{ borderRadius: 20, padding: 24, alignItems: 'center', gap: 12 }}
                     >
                         <View style={{ position: 'relative' }}>
-                            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-                                <Text style={{ fontSize: 28, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.white }}>MS</Text>
+                            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                {avatarImage ? (
+                                    <Image source={{ uri: avatarImage }} style={{ width: 80, height: 80, borderRadius: 40 }} resizeMode="cover" />
+                                ) : (
+                                    <Text style={{ fontSize: 28, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.white }}>{avatarInitials}</Text>
+                                )}
                             </View>
                             <Pressable
+                                onPress={handlePickAvatar}
+                                disabled={uploadImageMutation.isPending}
                                 style={({ pressed }) => ({
                                     position: 'absolute',
                                     bottom: 0,
@@ -419,7 +475,11 @@ export default function SettingsScreen() {
                                     borderColor: 'rgba(255,255,255,0.5)',
                                 })}
                             >
-                                <CameraIcon />
+                                {uploadImageMutation.isPending ? (
+                                    <ActivityIndicator size="small" color={AppColors.white} />
+                                ) : (
+                                    <CameraIcon />
+                                )}
                             </Pressable>
                         </View>
                         <View style={{ alignItems: 'center', gap: 4 }}>
@@ -427,7 +487,7 @@ export default function SettingsScreen() {
                             <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: 'rgba(255,255,255,0.7)' }}>{info.email}</Text>
                         </View>
                         <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 }}>
-                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>Forensic Expert</Text>
+                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>{roleLabel}</Text>
                         </View>
                     </LinearGradient>
 

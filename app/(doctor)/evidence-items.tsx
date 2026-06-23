@@ -20,28 +20,36 @@ function BackIcon() {
     );
 }
 
-function EvidenceIcon({ type }: { type: string }) {
+function ManualIcon({ color }: { color: string }) {
+    return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+    );
+}
+
+function EvidenceIcon({ type, color }: { type: string; color: string }) {
     if (type === 'image') {
         return (
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                <Rect x={3} y={3} width={18} height={18} rx={2} stroke={AppColors.primary} strokeWidth={1.5} />
-                <Path d="M3 16l5-5 4 4 3-3 6 6" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M14.5 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" fill={AppColors.primary} />
+                <Rect x={3} y={3} width={18} height={18} rx={2} stroke={color} strokeWidth={1.5} />
+                <Path d="M3 16l5-5 4 4 3-3 6 6" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M14.5 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" fill={color} />
             </Svg>
         );
     }
     if (type === 'video') {
         return (
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                <Path d="M23 7l-7 5 7 5V7z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                <Rect x={1} y={5} width={15} height={14} rx={2} stroke={AppColors.primary} strokeWidth={1.5} />
+                <Path d="M23 7l-7 5 7 5V7z" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                <Rect x={1} y={5} width={15} height={14} rx={2} stroke={color} strokeWidth={1.5} />
             </Svg>
         );
     }
     if (type === 'dna') {
         return (
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                <Path d="M2 15c6.667-6 13.333 0 20-6M2 9c6.667 6 13.333 0 20 6M12 3v18" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" />
+                <Path d="M2 15c6.667-6 13.333 0 20-6M2 9c6.667 6 13.333 0 20 6M12 3v18" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
             </Svg>
         );
     }
@@ -50,12 +58,12 @@ function EvidenceIcon({ type }: { type: string }) {
         <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
             <Path
                 d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
-                stroke={AppColors.primary}
+                stroke={color}
                 strokeWidth={1.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
-            <Path d="M14 2v6h6" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M14 2v6h6" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
@@ -104,6 +112,8 @@ function CalendarIcon() {
     );
 }
 
+type EvidenceSource = 'manual' | 'ai';
+
 interface EvidenceItem {
     id: string;
     caseId: number;
@@ -111,24 +121,43 @@ interface EvidenceItem {
     type: 'image' | 'video' | 'dna' | 'document';
     typeLabel: string;
     caseLabel: string;
+    source: EvidenceSource;
 }
 
-function deriveType(modelUsed: string): { type: EvidenceItem['type']; typeLabel: string } {
-    const model = (modelUsed || '').toLowerCase();
-    if (model.includes('dna')) {
-        return { type: 'dna', typeLabel: 'DNA Sample' };
+const AI_MODEL_LABELS: Record<string, string> = {
+    deepfake: 'Deep Fake Detection',
+    'deep fake': 'Deep Fake Detection',
+    face: 'Face Recognition',
+    dna: 'DNA Phenotype Prediction',
+    reconstruct: 'Reconstruct Image',
+};
+
+function classifySource(modelUsed: string): EvidenceSource {
+    const model = (modelUsed || '').trim().toLowerCase();
+    if (!model || model === 'manual') {
+        return 'manual';
     }
-    if (model.includes('reconstruct') || model.includes('deepfake') || model.includes('deep fake') || model.includes('face') || model.includes('image')) {
-        return { type: 'image', typeLabel: modelUsed || 'Image' };
+    return 'ai';
+}
+
+function deriveType(modelUsed: string, source: EvidenceSource): { type: EvidenceItem['type']; typeLabel: string } {
+    if (source === 'manual') {
+        return { type: 'document', typeLabel: 'Manual Upload' };
+    }
+    const model = modelUsed.toLowerCase();
+    const aiLabel = AI_MODEL_LABELS[model] ?? modelUsed;
+    if (model.includes('dna')) {
+        return { type: 'dna', typeLabel: aiLabel };
     }
     if (model.includes('video') || model.includes('cctv')) {
-        return { type: 'video', typeLabel: modelUsed || 'Video' };
+        return { type: 'video', typeLabel: aiLabel };
     }
-    return { type: 'document', typeLabel: modelUsed || 'Document' };
+    return { type: 'image', typeLabel: aiLabel };
 }
 
 function mapEvidence(ev: Evidence): EvidenceItem {
-    const { type, typeLabel } = deriveType(ev.model_used);
+    const source = classifySource(ev.model_used);
+    const { type, typeLabel } = deriveType(ev.model_used, source);
     return {
         id: String(ev.id),
         caseId: ev.case_id,
@@ -136,6 +165,7 @@ function mapEvidence(ev: Evidence): EvidenceItem {
         type,
         typeLabel,
         caseLabel: `CASE-${ev.case_id}`,
+        source,
     };
 }
 
@@ -146,6 +176,7 @@ export default function EvidenceItems() {
     const deleteEvidence = useDeleteEvidenceMutation();
 
     const evidenceItems: EvidenceItem[] = (data ?? []).map(mapEvidence);
+    const manualColor = '#7C3AED';
 
     const handleDelete = (item: EvidenceItem) => {
         Alert.alert(
@@ -223,41 +254,66 @@ export default function EvidenceItems() {
                                 padding: 16,
                             }}
                         >
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                {/* Icon */}
-                                <View
-                                    style={{
-                                        width: 44,
-                                        height: 44,
-                                        borderRadius: 12,
-                                        backgroundColor: AppColors.primary + '10',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}
-                                >
-                                    <EvidenceIcon type={item.type} />
-                                </View>
+                            {(() => {
+                                const isManual = item.source === 'manual';
+                                const accent = isManual ? manualColor : AppColors.primary;
+                                return (
+                                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                                        {/* Icon */}
+                                        <View
+                                            style={{
+                                                width: 44,
+                                                height: 44,
+                                                borderRadius: 12,
+                                                backgroundColor: accent + '10',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            {isManual ? (
+                                                <ManualIcon color={accent} />
+                                            ) : (
+                                                <EvidenceIcon type={item.type} color={accent} />
+                                            )}
+                                        </View>
 
-                                {/* Info */}
-                                <View style={{ flex: 1, gap: 4 }}>
-                                    <Text
-                                        style={{
-                                            fontSize: 14,
-                                            fontFamily: 'IBMPlexSans_600SemiBold',
-                                            color: AppColors.textPrimary,
-                                        }}
-                                        numberOfLines={1}
-                                    >
-                                        {item.title}
-                                    </Text>
-                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
-                                        {item.typeLabel}
-                                    </Text>
-                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                        {item.caseLabel}
-                                    </Text>
-                                </View>
-                            </View>
+                                        {/* Info */}
+                                        <View style={{ flex: 1, gap: 4 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <Text
+                                                    style={{
+                                                        flexShrink: 1,
+                                                        fontSize: 14,
+                                                        fontFamily: 'IBMPlexSans_600SemiBold',
+                                                        color: AppColors.textPrimary,
+                                                    }}
+                                                    numberOfLines={1}
+                                                >
+                                                    {item.title}
+                                                </Text>
+                                                <View
+                                                    style={{
+                                                        backgroundColor: accent + '14',
+                                                        borderRadius: 6,
+                                                        paddingHorizontal: 8,
+                                                        paddingVertical: 2,
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: accent, letterSpacing: 0.3 }}>
+                                                        {isManual ? 'MANUAL' : 'AI'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
+                                                {item.typeLabel}
+                                            </Text>
+                                            <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
+                                                {item.caseLabel}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })()}
 
                             {/* Bottom row: case + actions */}
                             <View
