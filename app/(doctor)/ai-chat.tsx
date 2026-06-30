@@ -7,6 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '@/constants/theme';
 import { Linking } from 'react-native';
@@ -733,51 +734,100 @@ export default function AiChat() {
                     </ScrollView>
                 ) : messages.length === 0 && !isTyping && !activeChatId ? (
                     <ScrollView
-                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 }}
+                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 36 }}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                     >
-                        <View style={{ alignItems: 'center', gap: 14, marginBottom: 28 }}>
-                            <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: AppColors.primary + '12', alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="sparkles" size={28} color="#1E2A5E" />
+                        <View style={{ alignItems: 'center', marginBottom: 30 }}>
+                            <View style={{ width: 104, height: 104, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                                <View style={{ position: 'absolute', width: 104, height: 104, borderRadius: 34, backgroundColor: AppColors.secondary + '14' }} />
+                                <View style={{ position: 'absolute', width: 86, height: 86, borderRadius: 28, backgroundColor: AppColors.primary + '12' }} />
+                                <LinearGradient
+                                    colors={[AppColors.primary, AppColors.secondary]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{
+                                        width: 68,
+                                        height: 68,
+                                        borderRadius: 22,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        shadowColor: AppColors.primary,
+                                        shadowOffset: { width: 0, height: 8 },
+                                        shadowOpacity: 0.28,
+                                        shadowRadius: 16,
+                                        elevation: 8,
+                                    }}
+                                >
+                                    <Ionicons name="sparkles" size={30} color={AppColors.white} />
+                                </LinearGradient>
                             </View>
-                            <Text style={{ fontSize: 20, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary, textAlign: 'center' }}>
+                            <Text style={{ fontSize: 26, lineHeight: 32, fontFamily: 'IBMPlexSans_700Bold', color: AppColors.textPrimary, textAlign: 'center', letterSpacing: -0.5 }}>
                                 {timeOfDayGreeting()}{user?.name?.trim() ? `, ${user.name.replace(/\s+/g, ' ').trim()}` : ''}
                             </Text>
-                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280', textAlign: 'center', lineHeight: 21, maxWidth: 320 }}>
+                            <Text style={{ fontSize: 14, lineHeight: 22, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280', textAlign: 'center', maxWidth: 320, marginTop: 10 }}>
                                 I&apos;m your forensic medicine assistant. Ask a clinical or medico-legal question and I&apos;ll answer with evidence from PubMed and current web sources.
                             </Text>
                         </View>
 
-                        <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 10, marginLeft: 2 }}>
-                            TRY ASKING
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14, marginLeft: 2 }}>
+                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_700Bold', color: '#9CA3AF', letterSpacing: 1 }}>
+                                TRY ASKING
+                            </Text>
+                            <View style={{ flex: 1, height: 1, backgroundColor: '#EDEFF2' }} />
+                        </View>
+
                         <View style={{ gap: 10 }}>
-                            {SUGGESTIONS.map((s) => (
-                                <Pressable
-                                    key={s.label}
-                                    onPress={() => sendMessage(s.query)}
-                                    style={({ pressed }) => ({
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 12,
-                                        padding: 14,
-                                        borderRadius: 14,
-                                        backgroundColor: pressed ? '#F3F4F6' : AppColors.white,
-                                        borderWidth: 1,
-                                        borderColor: '#E5E7EB',
-                                    })}
-                                >
-                                    <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: AppColors.primary + '10', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="medical-outline" size={17} color="#1E2A5E" />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{s.label}</Text>
-                                        <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }} numberOfLines={1}>{s.query}</Text>
-                                    </View>
-                                    <Ionicons name="arrow-forward" size={16} color="#9CA3AF" />
-                                </Pressable>
-                            ))}
+                            {SUGGESTIONS.map((s) => {
+                                const meta: Record<string, { icon: keyof typeof Ionicons.glyphMap; tint: string }> = {
+                                    'Cause of death': { icon: 'body-outline', tint: AppColors.primary },
+                                    'Time of death': { icon: 'time-outline', tint: AppColors.secondary },
+                                    'Asphyxia signs': { icon: 'pulse-outline', tint: AppColors.primary },
+                                    'Toxicology': { icon: 'flask-outline', tint: AppColors.secondary },
+                                };
+                                const m = meta[s.label] ?? { icon: 'medical-outline' as const, tint: AppColors.primary };
+                                return (
+                                    <Pressable
+                                        key={s.label}
+                                        onPress={() => sendMessage(s.query)}
+                                        style={({ pressed }) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            gap: 13,
+                                            paddingVertical: 13,
+                                            paddingHorizontal: 14,
+                                            borderRadius: 16,
+                                            backgroundColor: pressed ? '#F7F8FA' : AppColors.white,
+                                            borderWidth: 1,
+                                            borderColor: pressed ? m.tint + '33' : '#ECEEF1',
+                                            transform: [{ scale: pressed ? 0.985 : 1 }],
+                                            shadowColor: AppColors.primary,
+                                            shadowOffset: { width: 0, height: 3 },
+                                            shadowOpacity: pressed ? 0.03 : 0.06,
+                                            shadowRadius: 8,
+                                            elevation: pressed ? 1 : 2,
+                                        })}
+                                    >
+                                        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: m.tint + '14', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name={m.icon} size={19} color={m.tint} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 14, lineHeight: 18, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>{s.label}</Text>
+                                            <Text style={{ fontSize: 11, lineHeight: 15, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF', marginTop: 2 }} numberOfLines={1}>{s.query}</Text>
+                                        </View>
+                                        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: m.tint + '0D', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="arrow-forward" size={14} color={m.tint} />
+                                        </View>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 22 }}>
+                            <Ionicons name="shield-checkmark-outline" size={13} color="#9CA3AF" />
+                            <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_500Medium', color: '#9CA3AF', letterSpacing: 0.2 }}>
+                                Powered by PubMed + live web sources
+                            </Text>
                         </View>
                     </ScrollView>
                 ) : (
