@@ -518,6 +518,8 @@ export default function ResultsReconstructScreen() {
             <AddToCaseModal
                 visible={caseModalVisible}
                 onClose={() => setCaseModalVisible(false)}
+                modelUsed="reconstruct"
+                resultData={parsed.raw as Record<string, unknown>}
             />
         </View>
     );

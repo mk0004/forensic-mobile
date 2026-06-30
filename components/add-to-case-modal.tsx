@@ -67,13 +67,15 @@ export function AddToCaseModal({ visible, onClose, onSuccess, modelUsed, resultD
         return caseOptions.filter(c => c.title.toLowerCase().includes(q) || c.displayId.toLowerCase().includes(q));
     }, [search, caseOptions]);
 
+    const resolvedModelUsed = (modelUsed ?? '').trim();
+
     function handleConfirm() {
-        if (!selectedCase || !evidenceTitle.trim()) return;
+        if (!selectedCase || !evidenceTitle.trim() || !resolvedModelUsed) return;
         const caseId = selectedCase.id;
         saveEvidence.mutate(
             {
                 name: evidenceTitle.trim(),
-                model_used: modelUsed ?? '',
+                model_used: resolvedModelUsed,
                 case_id: caseId,
                 data: {
                     ...(resultData ?? {}),
@@ -216,6 +218,12 @@ export function AddToCaseModal({ visible, onClose, onSuccess, modelUsed, resultD
                         }}
                     />
 
+                    {!resolvedModelUsed && (
+                        <Text style={{ ...Typography.caption, color: AppColors.error, marginTop: -8, marginBottom: 14 }}>
+                            Missing model information. Open this from a model analysis result to save it as evidence.
+                        </Text>
+                    )}
+
                     {/* Buttons */}
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                         <Pressable
@@ -240,13 +248,13 @@ export function AddToCaseModal({ visible, onClose, onSuccess, modelUsed, resultD
                         </Pressable>
                         <Pressable
                             onPress={handleConfirm}
-                            disabled={!evidenceTitle.trim() || saveEvidence.isPending}
+                            disabled={!evidenceTitle.trim() || !resolvedModelUsed || saveEvidence.isPending}
                             style={({ pressed }) => ({
                                 flex: 1,
                                 paddingVertical: 14,
                                 borderRadius: 12,
                                 alignItems: 'center',
-                                backgroundColor: !evidenceTitle.trim()
+                                backgroundColor: !evidenceTitle.trim() || !resolvedModelUsed
                                     ? '#D1D5DB'
                                     : pressed
                                         ? AppColors.primaryHover

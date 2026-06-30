@@ -559,6 +559,8 @@ export default function ResultsDnaScreen() {
             <AddToCaseModal
                 visible={caseModalVisible}
                 onClose={() => setCaseModalVisible(false)}
+                modelUsed="dna"
+                resultData={parsed.raw as Record<string, unknown>}
             />
         </View>
     );

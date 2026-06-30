@@ -487,6 +487,8 @@ export default function ResultsFaceRecognitionScreen() {
             <AddToCaseModal
                 visible={caseModalVisible}
                 onClose={() => setCaseModalVisible(false)}
+                modelUsed="face"
+                resultData={parsed.raw as Record<string, unknown>}
             />
         </View>
     );

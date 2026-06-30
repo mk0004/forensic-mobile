@@ -578,6 +578,8 @@ export default function ResultsDeepfakeScreen() {
             <AddToCaseModal
                 visible={caseModalVisible}
                 onClose={() => setCaseModalVisible(false)}
+                modelUsed="deepfake"
+                resultData={parsed as unknown as Record<string, unknown>}
             />
         </View>
     );
