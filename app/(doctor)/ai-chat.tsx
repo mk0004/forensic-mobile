@@ -754,20 +754,20 @@ export default function AiChat() {
                                 elevation: 8,
                             }}
                         >
-                            <View style={{ position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: AppColors.secondary + '24' }} />
-                            <View style={{ position: 'absolute', bottom: -50, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: AppColors.secondary + '14' }} />
+                            <View style={{ position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: AppColors.white + '12' }} />
+                            <View style={{ position: 'absolute', bottom: -50, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: AppColors.white + '0A' }} />
 
                             <View style={{
                                 width: 54,
                                 height: 54,
                                 borderRadius: 16,
-                                backgroundColor: AppColors.secondary,
+                                backgroundColor: AppColors.white,
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 marginBottom: 16,
-                                shadowColor: AppColors.secondary,
+                                shadowColor: AppColors.black,
                                 shadowOffset: { width: 0, height: 6 },
-                                shadowOpacity: 0.4,
+                                shadowOpacity: 0.2,
                                 shadowRadius: 12,
                                 elevation: 6,
                             }}>
@@ -782,7 +782,7 @@ export default function AiChat() {
                             </Text>
 
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 }}>
-                                <Ionicons name="shield-checkmark" size={14} color={AppColors.secondary} />
+                                <Ionicons name="shield-checkmark" size={14} color={AppColors.white + 'CC'} />
                                 <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.white + 'B3', letterSpacing: 0.2 }}>
                                     Evidence-based · PubMed + Web
                                 </Text>
@@ -794,7 +794,7 @@ export default function AiChat() {
                         </Text>
 
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                            {SUGGESTIONS.map((s, i) => {
+                            {SUGGESTIONS.map((s) => {
                                 const meta: Record<string, keyof typeof Ionicons.glyphMap> = {
                                     'Cause of death': 'body-outline',
                                     'Time of death': 'time-outline',
@@ -802,7 +802,6 @@ export default function AiChat() {
                                     'Toxicology': 'flask-outline',
                                 };
                                 const icon = meta[s.label] ?? 'medical-outline';
-                                const accent = i % 2 === 0 ? AppColors.primary : AppColors.secondary;
                                 return (
                                     <Pressable
                                         key={s.label}
@@ -815,7 +814,7 @@ export default function AiChat() {
                                             paddingHorizontal: 14,
                                             backgroundColor: pressed ? AppColors.surface : AppColors.white,
                                             borderWidth: 1,
-                                            borderColor: pressed ? accent : AppColors.primary + '14',
+                                            borderColor: pressed ? AppColors.primary : AppColors.primary + '14',
                                             transform: [{ scale: pressed ? 0.97 : 1 }],
                                             shadowColor: AppColors.primary,
                                             shadowOffset: { width: 0, height: 4 },
@@ -828,12 +827,12 @@ export default function AiChat() {
                                             width: 42,
                                             height: 42,
                                             borderRadius: 13,
-                                            backgroundColor: accent + '14',
+                                            backgroundColor: AppColors.primary + '12',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             marginBottom: 12,
                                         }}>
-                                            <Ionicons name={icon} size={21} color={accent} />
+                                            <Ionicons name={icon} size={21} color={AppColors.primary} />
                                         </View>
                                         <Text style={{ fontSize: 14, lineHeight: 18, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
                                             {s.label}
