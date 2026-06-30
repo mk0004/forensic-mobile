@@ -1,20 +1,13 @@
-import { View, Text, ScrollView, Pressable, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
 import { TabSlideIn } from '@/components/tab-slide-in';
+import { AppHeader } from '@/components/app-header';
 
 /* ─── Icons ─── */
-function BellIcon() {
-    return (
-        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke={AppColors.textPrimary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-
 function AnalysisModelsIcon() {
     return (
         <Svg width={80} height={80} viewBox="0 0 56 56" fill="none">
@@ -73,40 +66,7 @@ export default function ExploreScreen() {
                         paddingBottom: insets.bottom + 100,
                     }}
                 >
-                    {/* Header — same as Dashboard */}
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        paddingHorizontal: Spacing.md,
-                        paddingVertical: 12,
-                        backgroundColor: AppColors.white,
-                    }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <Image
-                                source={require('@/assets/images/forensic-logo.png')}
-                                style={{ width: 40, height: 40, borderRadius: 20 }}
-                                resizeMode="contain"
-                            />
-                            <Text style={{ fontSize: 18, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
-                                Forensic
-                            </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <Pressable hitSlop={8}>
-                                <BellIcon />
-                            </Pressable>
-                            <View style={{
-                                width: 36, height: 36, borderRadius: 18,
-                                backgroundColor: AppColors.primary + '20',
-                                alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
-                                    DR
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
+                    <AppHeader onBellPress={() => router.push('/(doctor)/(tabs)')} />
 
                     {/* Section Title */}
                     <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.lg, gap: 4 }}>

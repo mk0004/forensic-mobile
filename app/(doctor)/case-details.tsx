@@ -131,6 +131,7 @@ type AnalysisEvidence = {
     name: string;
     modelType: string;
     modelName: string;
+    resultSummary: string;
     date: string;
     verdict: string;
     verdictColor: string;
@@ -152,6 +153,57 @@ const MODEL_TYPE_NAMES: Record<string, string> = {
     dna: 'DNA Phenotype Prediction',
     reconstruct: 'Reconstruct Image',
 };
+
+function asArray(value: unknown): any[] {
+    return Array.isArray(value) ? value : [];
+}
+
+function summarizeResult(modelType: string, data: Record<string, unknown>): string {
+    if (modelType === 'deepfake') {
+        const faces = asArray(data.faces || data.results || data.predictions);
+        if (faces.length === 0) {
+            return 'No face detected';
+        }
+        const fake = faces.filter((f) => {
+            const label = String(f?.label ?? f?.prediction ?? f?.result ?? '').toLowerCase();
+            return label.includes('fake') || label.includes('spoof') || f?.is_real === false;
+        }).length;
+        const real = faces.length - fake;
+        if (fake === 0) {
+            return faces.length === 1 ? 'Real' : `${real} real`;
+        }
+        if (real === 0) {
+            return faces.length === 1 ? 'Fake' : `${fake} fake`;
+        }
+        return `${real} real · ${fake} fake`;
+    }
+    if (modelType === 'face') {
+        const matches = asArray(data.identities || data.matches || data.results || data.faces);
+        const names = matches
+            .map((m) => String(m?.person_name ?? m?.identity ?? m?.name ?? m?.label ?? '').trim())
+            .filter((n) => n && !n.toLowerCase().includes('unknown'));
+        if (names.length === 0) {
+            return 'No match found';
+        }
+        if (names.length === 1) {
+            return names[0];
+        }
+        return `${names[0]} +${names.length - 1} more`;
+    }
+    if (modelType === 'dna') {
+        const source = data.predictions || data.results || data.phenotypes || data.traits;
+        const count = Array.isArray(source)
+            ? source.length
+            : source && typeof source === 'object'
+                ? Object.keys(source).length
+                : 0;
+        return count > 0 ? `${count} traits predicted` : 'Analysis complete';
+    }
+    if (modelType === 'reconstruct') {
+        return data.restored_image || data.output || data.result ? 'Image enhanced' : 'Analysis complete';
+    }
+    return 'Analysis complete';
+}
 
 function normalizeModelType(modelUsed?: string): string | null {
     if (!modelUsed) {
@@ -180,15 +232,17 @@ function splitEvidence(evidence: Evidence[]): { analyses: AnalysisEvidence[]; us
     for (const item of evidence) {
         const modelType = normalizeModelType(item.model_used);
         if (modelType) {
+            const analysisData = (item.data ?? {}) as Record<string, unknown>;
             analyses.push({
                 id: String(item.id),
                 name: item.name,
                 modelType,
                 modelName: MODEL_TYPE_NAMES[modelType] ?? item.model_used,
+                resultSummary: summarizeResult(modelType, analysisData),
                 date: '',
                 verdict: 'Analysis Complete',
                 verdictColor: AppColors.primary,
-                mockData: item.data ?? {},
+                mockData: analysisData,
             });
         } else {
             const data = (item.data ?? {}) as Record<string, unknown>;
@@ -545,6 +599,12 @@ export default function CaseDetails() {
                                                 <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
                                                     {a.modelName}
                                                 </Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: AppColors.secondary }} />
+                                                    <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }} numberOfLines={1}>
+                                                        {a.resultSummary}
+                                                    </Text>
+                                                </View>
                                             </View>
                                             <ChevronRightModelIcon size={16} />
                                         </Pressable>
