@@ -762,40 +762,41 @@ export default function CaseDetails() {
                                 </Text>
                             </Pressable>
                         </View>
-                        {/* Edit Case */}
-                        {!isCompleted && (
-                            <Pressable
-                                onPress={() => {
-                                    if (fetchedCase) {
-                                        toggleActiveCase.mutate(fetchedCase.id);
-                                    }
-                                }}
-                                disabled={toggleActiveCase.isPending || !fetchedCase}
-                                style={({ pressed }) => ({
-                                    flexDirection: 'row',
-                                    backgroundColor: pressed ? '#15803d' : AppColors.success,
-                                    borderRadius: 12,
-                                    height: 48,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 8,
-                                    opacity: toggleActiveCase.isPending ? 0.7 : 1,
-                                })}
-                            >
-                                {toggleActiveCase.isPending ? (
-                                    <ActivityIndicator color={AppColors.white} />
-                                ) : (
-                                    <>
-                                        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                                            <Path d="M20 6L9 17l-5-5" stroke={AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                        </Svg>
-                                        <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
-                                            Mark as Complete
-                                        </Text>
-                                    </>
-                                )}
-                            </Pressable>
-                        )}
+                        <Pressable
+                            onPress={() => {
+                                if (fetchedCase) {
+                                    toggleActiveCase.mutate(fetchedCase.id);
+                                }
+                            }}
+                            disabled={toggleActiveCase.isPending || !fetchedCase}
+                            style={({ pressed }) => ({
+                                flexDirection: 'row',
+                                backgroundColor: isCompleted
+                                    ? (pressed ? AppColors.success + '20' : AppColors.success + '12')
+                                    : (pressed ? '#15803d' : AppColors.success),
+                                borderWidth: isCompleted ? 1.5 : 0,
+                                borderColor: AppColors.success,
+                                borderRadius: 12,
+                                height: 48,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                opacity: toggleActiveCase.isPending ? 0.7 : 1,
+                            })}
+                        >
+                            {toggleActiveCase.isPending ? (
+                                <ActivityIndicator color={isCompleted ? AppColors.success : AppColors.white} />
+                            ) : (
+                                <>
+                                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                                        <Path d="M20 6L9 17l-5-5" stroke={isCompleted ? AppColors.success : AppColors.white} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                    </Svg>
+                                    <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: isCompleted ? AppColors.success : AppColors.white }}>
+                                        {isCompleted ? 'Completed' : 'Mark as Complete'}
+                                    </Text>
+                                </>
+                            )}
+                        </Pressable>
                     </View>
                 </View>
                 )}
