@@ -64,7 +64,7 @@ function UserIcon() {
 export default function ResultsFaceRecognitionScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { imageUri, apiData, errorData } = useLocalSearchParams<{ imageUri: string; apiData: string; errorData: string }>();
+    const { imageUri, apiData, errorData, fromCase } = useLocalSearchParams<{ imageUri: string; apiData: string; errorData: string; fromCase: string }>();
     const [caseModalVisible, setCaseModalVisible] = useState(false);
     const [origSize, setOrigSize] = useState({ w: 0, h: 0 });
     const screenWidth = Dimensions.get('window').width - Spacing.md * 2;
@@ -459,25 +459,27 @@ export default function ResultsFaceRecognitionScreen() {
                                     </Text>
                                 </Pressable>
 
-                                <Pressable
-                                    onPress={() => setCaseModalVisible(true)}
-                                    style={({ pressed }) => ({
-                                        backgroundColor: pressed ? '#F0F4FF' : AppColors.white,
-                                        borderRadius: 14,
-                                        paddingVertical: 14,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: 8,
-                                        borderWidth: 1.5,
-                                        borderColor: AppColors.primary,
-                                    })}
-                                >
-                                    <FolderIcon />
-                                    <Text style={{ ...Typography.button, color: AppColors.primary }}>
-                                        Add to Case
-                                    </Text>
-                                </Pressable>
+                                {!fromCase && (
+                                    <Pressable
+                                        onPress={() => setCaseModalVisible(true)}
+                                        style={({ pressed }) => ({
+                                            backgroundColor: pressed ? '#F0F4FF' : AppColors.white,
+                                            borderRadius: 14,
+                                            paddingVertical: 14,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 8,
+                                            borderWidth: 1.5,
+                                            borderColor: AppColors.primary,
+                                        })}
+                                    >
+                                        <FolderIcon />
+                                        <Text style={{ ...Typography.button, color: AppColors.primary }}>
+                                            Add to Case
+                                        </Text>
+                                    </Pressable>
+                                )}
                             </View>
                         </>
                     )}

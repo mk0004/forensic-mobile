@@ -243,22 +243,22 @@ export default function CaseDetails() {
         if (analysis.modelType === 'deepfake') {
             router.push({
                 pathname: route as any,
-                params: { imageUri: savedImageUri, apiData: JSON.stringify(analysis.mockData) },
+                params: { imageUri: savedImageUri, apiData: JSON.stringify(analysis.mockData), fromCase: '1' },
             });
         } else if (analysis.modelType === 'face') {
             router.push({
                 pathname: route as any,
-                params: { imageUri: savedImageUri, apiData: JSON.stringify(analysis.mockData) },
+                params: { imageUri: savedImageUri, apiData: JSON.stringify(analysis.mockData), fromCase: '1' },
             });
         } else if (analysis.modelType === 'dna') {
             router.push({
                 pathname: route as any,
-                params: { inputMode: 'text', dnaText: 'ATCGATCG...', fileName: '' },
+                params: { inputMode: 'text', dnaText: 'ATCGATCG...', fileName: '', fromCase: '1' },
             });
         } else if (analysis.modelType === 'reconstruct') {
             router.push({
                 pathname: route as any,
-                params: { imageUri: savedImageUri },
+                params: { imageUri: savedImageUri, fromCase: '1' },
             });
         }
     }
