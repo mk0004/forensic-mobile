@@ -14,6 +14,7 @@ import {
     useToggleActiveCaseMutation,
     formatCaseDate,
     caseDisplayId,
+    isCompletedStatus,
 } from '@/lib/hooks/use-cases-api';
 import type { Evidence } from '@/types/api';
 
@@ -284,7 +285,7 @@ export default function CaseDetails() {
     const [editDrawerVisible, setEditDrawerVisible] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-    const isCompleted = (fetchedCase?.status ?? 'active').toLowerCase() === 'completed';
+    const isCompleted = isCompletedStatus(fetchedCase?.status ?? 'active');
     const caseStatus = isCompleted ? 'Completed' : 'Active';
     const userEvidence = evidence.userEvidence;
     const totalEvidence = evidence.analyses.length + userEvidence.length;

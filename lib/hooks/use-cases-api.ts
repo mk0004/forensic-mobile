@@ -53,7 +53,7 @@ function toCase(raw: unknown): Case {
   };
 }
 
-function isCompletedStatus(status: string): boolean {
+export function isCompletedStatus(status: string): boolean {
   const normalized = status.trim().toLowerCase();
   return normalized === 'completed' || normalized === 'complete';
 }
@@ -249,8 +249,9 @@ export function useToggleActiveCaseMutation() {
   return useMutation({
     mutationFn: (id: number | string) =>
       authFetch<unknown>(RAILWAY_ROUTES.toggleActiveCase(id)),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: CASES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['cases', 'detail', id] });
     },
   });
 }
