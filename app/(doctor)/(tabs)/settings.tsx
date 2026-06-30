@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, Image, ScrollView, Pressable, Switch, TextInput as RNTextInput, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, Pressable, TextInput as RNTextInput, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -30,61 +30,6 @@ function LockIcon() {
         <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Rect x={3} y={11} width={18} height={11} rx={2} stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
             <Path d="M7 11V7a5 5 0 0110 0v4" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-function BellIcon() {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9zM13.73 21a2 2 0 01-3.46 0" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-function PaletteIcon() {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.63 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.97-4.5-9-10-9z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-            <Circle cx={7.5} cy={11.5} r={1.5} fill={AppColors.primary} />
-            <Circle cx={12} cy={7.5} r={1.5} fill={AppColors.primary} />
-            <Circle cx={16.5} cy={11.5} r={1.5} fill={AppColors.primary} />
-        </Svg>
-    );
-}
-function GlobeIcon() {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={10} stroke={AppColors.primary} strokeWidth={1.5} />
-            <Path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-function DatabaseIcon() {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M12 2C6.48 2 2 3.79 2 6v12c0 2.21 4.48 4 10 4s10-1.79 10-4V6c0-2.21-4.48-4-10-4z" stroke={AppColors.primary} strokeWidth={1.5} />
-            <Path d="M2 6c0 2.21 4.48 4 10 4s10-1.79 10-4M2 12c0 2.21 4.48 4 10 4s10-1.79 10-4" stroke={AppColors.primary} strokeWidth={1.5} />
-        </Svg>
-    );
-}
-function HelpIcon() {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={10} stroke={AppColors.primary} strokeWidth={1.5} />
-            <Path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-function FlagIcon() {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
-    );
-}
-function ShieldIcon() {
-    return (
-        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke={AppColors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
     );
 }
@@ -325,7 +270,6 @@ export default function SettingsScreen() {
     const [pwError, setPwError] = useState('');
     const [pwSuccess, setPwSuccess] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'settings'>('personal');
-    const [notifications, setNotifications] = useState(true);
     const [updateState, setUpdateState] = useState<'idle' | 'checking' | 'uptodate' | 'available'>('idle');
 
     const handleCheckUpdate = useCallback(async () => {
@@ -745,40 +689,6 @@ export default function SettingsScreen() {
                     {/* ─── App Settings Tab ─── */}
                     {activeTab === 'settings' && (
                         <>
-                            <SectionCard title="App Settings">
-                                <MenuRow icon={<PaletteIcon />} label="Appearance" />
-                                <Divider />
-                                <MenuRow icon={<GlobeIcon />} label="Language" rightElement={
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>English</Text>
-                                        <ChevronRight />
-                                    </View>
-                                } />
-                                <Divider />
-                                <MenuRow
-                                    icon={<BellIcon />}
-                                    label="Notifications"
-                                    rightElement={
-                                        <Switch
-                                            value={notifications}
-                                            onValueChange={setNotifications}
-                                            trackColor={{ false: '#E5E7EB', true: AppColors.primary + '60' }}
-                                            thumbColor={notifications ? AppColors.primary : '#F4F4F4'}
-                                        />
-                                    }
-                                />
-                                <Divider />
-                                <MenuRow icon={<DatabaseIcon />} label="Data & Storage" />
-                            </SectionCard>
-
-                            <SectionCard title="Support">
-                                <MenuRow icon={<HelpIcon />} label="Help Center" />
-                                <Divider />
-                                <MenuRow icon={<FlagIcon />} label="Report a Problem" />
-                                <Divider />
-                                <MenuRow icon={<ShieldIcon />} label="Terms & Privacy Policy" />
-                            </SectionCard>
-
                             <Pressable
                                 onPress={handleLogout}
                                 style={({ pressed }) => ({
