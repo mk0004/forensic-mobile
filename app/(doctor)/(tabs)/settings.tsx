@@ -326,6 +326,35 @@ export default function SettingsScreen() {
     const [pwSuccess, setPwSuccess] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'settings'>('personal');
     const [notifications, setNotifications] = useState(true);
+    const [updateState, setUpdateState] = useState<'idle' | 'checking' | 'uptodate' | 'available'>('idle');
+
+    const handleCheckUpdate = useCallback(async () => {
+        if (!Updates.isEnabled || __DEV__) {
+            setUpdateState('uptodate');
+            return;
+        }
+        setUpdateState('checking');
+        try {
+            const result = await Updates.checkForUpdateAsync();
+            if (result.isAvailable) {
+                await Updates.fetchUpdateAsync();
+                setUpdateState('available');
+            } else {
+                setUpdateState('uptodate');
+            }
+        } catch {
+            setUpdateState('idle');
+            showError('Could not check for updates. Please try again.');
+        }
+    }, [showError]);
+
+    const handleApplyUpdate = useCallback(async () => {
+        try {
+            await Updates.reloadAsync();
+        } catch {
+            showError('Could not restart to apply the update.');
+        }
+    }, [showError]);
     const [info, setInfo] = useState<ProfileInfo>(initialInfo);
     const [baseline, setBaseline] = useState<ProfileInfo>(initialInfo);
     const [showDiscard, setShowDiscard] = useState(false);
@@ -769,17 +798,83 @@ export default function SettingsScreen() {
                                 <Text style={{ fontSize: 16, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.error }}>Log Out</Text>
                             </Pressable>
 
-                            <View style={{ alignItems: 'center', paddingTop: 24, paddingBottom: 8, gap: 4 }}>
-                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>
-                                    Forensic AI v{Updates.runtimeVersion ?? '1.0.0'}
-                                </Text>
-                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
-                                    {`Channel: ${Updates.channel ?? 'development'} · ${Updates.isEmbeddedLaunch ? 'Embedded build' : 'OTA update'}`}
-                                </Text>
-                                <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#C4C9D4' }}>
-                                    {`Update: ${Updates.updateId ? Updates.updateId.slice(0, 8) : 'none'}`}
-                                </Text>
-                            </View>
+                            <SectionCard title="App Version">
+                                <View style={{ paddingHorizontal: 16, paddingVertical: 16, gap: 14 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }}>
+                                            Current Version
+                                        </Text>
+                                        <Text style={{ fontSize: 15, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
+                                            v{Updates.runtimeVersion ?? '1.0.0'}
+                                        </Text>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
+                                            Update Channel
+                                        </Text>
+                                        <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: '#6B7280' }}>
+                                            {`${Updates.channel ?? 'development'} · ${Updates.isEmbeddedLaunch ? 'Embedded' : 'OTA'}`}
+                                        </Text>
+                                    </View>
+
+                                    {updateState === 'available' ? (
+                                        <Pressable
+                                            onPress={handleApplyUpdate}
+                                            style={({ pressed }) => ({
+                                                height: 46,
+                                                borderRadius: 12,
+                                                borderCurve: 'continuous' as const,
+                                                backgroundColor: pressed ? AppColors.primaryHover : AppColors.primary,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexDirection: 'row',
+                                                gap: 8,
+                                            })}
+                                        >
+                                            <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.white }}>
+                                                Update available — Restart Now
+                                            </Text>
+                                        </Pressable>
+                                    ) : (
+                                        <Pressable
+                                            onPress={handleCheckUpdate}
+                                            disabled={updateState === 'checking'}
+                                            style={({ pressed }) => ({
+                                                height: 46,
+                                                borderRadius: 12,
+                                                borderCurve: 'continuous' as const,
+                                                borderWidth: 1.5,
+                                                borderColor: updateState === 'uptodate' ? AppColors.success + '40' : '#E5E7EB',
+                                                backgroundColor: updateState === 'uptodate'
+                                                    ? AppColors.success + '12'
+                                                    : pressed ? '#F3F4F6' : AppColors.white,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexDirection: 'row',
+                                                gap: 8,
+                                            })}
+                                        >
+                                            {updateState === 'checking' ? (
+                                                <>
+                                                    <ActivityIndicator size="small" color={AppColors.primary} />
+                                                    <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                                        Checking…
+                                                    </Text>
+                                                </>
+                                            ) : updateState === 'uptodate' ? (
+                                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.success }}>
+                                                    Up to date
+                                                </Text>
+                                            ) : (
+                                                <Text style={{ fontSize: 14, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                                    Check for Updates
+                                                </Text>
+                                            )}
+                                        </Pressable>
+                                    )}
+                                </View>
+                            </SectionCard>
                         </>
                     )}
                 </ScrollView>
