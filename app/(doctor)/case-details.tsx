@@ -282,7 +282,7 @@ export default function CaseDetails() {
     const displayCaseId = fetchedCase ? caseDisplayId(fetchedCase.id) : caseDisplayId(caseId || '000');
 
     const [editDrawerVisible, setEditDrawerVisible] = useState(false);
-    const [deleteTarget, setDeleteTarget] = useState<UserEvidence | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
     const isCompleted = (fetchedCase?.status ?? 'active').toLowerCase() === 'completed';
     const caseStatus = isCompleted ? 'Completed' : 'Active';
@@ -606,6 +606,22 @@ export default function CaseDetails() {
                                                     </Text>
                                                 </View>
                                             </View>
+                                            {!isCompleted && (
+                                                <Pressable
+                                                    onPress={() => setDeleteTarget({ id: a.id, name: a.name })}
+                                                    hitSlop={8}
+                                                    style={({ pressed }) => ({
+                                                        width: 32,
+                                                        height: 32,
+                                                        borderRadius: 8,
+                                                        backgroundColor: pressed ? '#FEE2E2' : '#FEF2F2',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                    })}
+                                                >
+                                                    <TrashIcon />
+                                                </Pressable>
+                                            )}
                                             <ChevronRightModelIcon size={16} />
                                         </Pressable>
                                     );
@@ -662,7 +678,7 @@ export default function CaseDetails() {
                                             </Text>
                                         </View>
                                         <Pressable
-                                            onPress={() => setDeleteTarget(e)}
+                                            onPress={() => setDeleteTarget({ id: e.id, name: e.name })}
                                             hitSlop={8}
                                             style={({ pressed }) => ({
                                                 width: 32,
