@@ -14,6 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@/lib/query-client';
 import { AuthProvider } from '@/lib/auth-context';
 import { ErrorToastProvider } from '@/lib/error-toast';
+import { UpdatePrompt } from '@/components/ui/update-prompt';
 import 'react-native-reanimated';
 
 SplashScreen.preventAutoHideAsync();
@@ -48,6 +49,7 @@ export default function RootLayout() {
               <Stack.Screen name="(admin)" />
             </Stack>
             <StatusBar style="dark" />
+            <UpdatePrompt />
           </AuthProvider>
         </ErrorToastProvider>
       </QueryClientProvider>
