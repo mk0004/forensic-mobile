@@ -1,8 +1,8 @@
-// Local backend over LAN (phone must be on the same Wi-Fi as the dev machine).
-// Swap back to the ngrok/production URL below when not on the same network.
-export const RAILWAY_API_BASE_URL = 'http://192.168.1.38:8000';
+// Production backend on Railway (works from anywhere, no Wi-Fi/LAN needed).
+// Swap to the LAN URL below for local backend development on the same Wi-Fi.
+export const RAILWAY_API_BASE_URL = 'https://forensic-api-production.up.railway.app';
+// export const RAILWAY_API_BASE_URL = 'http://192.168.1.38:8000';
 // export const RAILWAY_API_BASE_URL = 'https://4d5a-156-207-227-98.ngrok-free.app';
-// export const RAILWAY_API_BASE_URL = 'https://forensic-ai-system-api-production.up.railway.app';
 
 // The backend returns asset URLs against its own host (e.g. http://127.0.0.1:8000),
 // which a phone cannot reach. Re-point any backend asset path at the active API base.
