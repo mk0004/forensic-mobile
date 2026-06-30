@@ -270,7 +270,8 @@ export default function SettingsScreen() {
     const [pwError, setPwError] = useState('');
     const [pwSuccess, setPwSuccess] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'settings'>('personal');
-    const [updateState, setUpdateState] = useState<'idle' | 'checking' | 'uptodate' | 'available'>('idle');
+    const [updateState, setUpdateState] = useState<'idle' | 'checking' | 'downloading' | 'uptodate' | 'available'>('idle');
+    const [downloadProgress, setDownloadProgress] = useState(0);
 
     const handleCheckUpdate = useCallback(async () => {
         if (!Updates.isEnabled || __DEV__) {
@@ -280,14 +281,25 @@ export default function SettingsScreen() {
         setUpdateState('checking');
         try {
             const result = await Updates.checkForUpdateAsync();
-            if (result.isAvailable) {
-                await Updates.fetchUpdateAsync();
-                setUpdateState('available');
-            } else {
+            if (!result.isAvailable) {
                 setUpdateState('uptodate');
+                return;
             }
+            setDownloadProgress(0);
+            setUpdateState('downloading');
+            const ticker = setInterval(() => {
+                setDownloadProgress((p) => (p < 0.9 ? p + 0.05 : p));
+            }, 120);
+            try {
+                await Updates.fetchUpdateAsync();
+            } finally {
+                clearInterval(ticker);
+            }
+            setDownloadProgress(1);
+            setUpdateState('available');
         } catch {
             setUpdateState('idle');
+            setDownloadProgress(0);
             showError('Could not check for updates. Please try again.');
         }
     }, [showError]);
@@ -746,6 +758,25 @@ export default function SettingsScreen() {
                                                 Update available — Restart Now
                                             </Text>
                                         </Pressable>
+                                    ) : updateState === 'downloading' ? (
+                                        <View style={{ gap: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                                    Downloading update…
+                                                </Text>
+                                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary }}>
+                                                    {Math.round(downloadProgress * 100)}%
+                                                </Text>
+                                            </View>
+                                            <View style={{ height: 8, borderRadius: 4, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                                                <View style={{
+                                                    height: 8,
+                                                    borderRadius: 4,
+                                                    width: `${Math.round(downloadProgress * 100)}%`,
+                                                    backgroundColor: AppColors.primary,
+                                                }} />
+                                            </View>
+                                        </View>
                                     ) : (
                                         <Pressable
                                             onPress={handleCheckUpdate}
