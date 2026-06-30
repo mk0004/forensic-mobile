@@ -520,6 +520,7 @@ export default function ResultsReconstructScreen() {
                 onClose={() => setCaseModalVisible(false)}
                 modelUsed="reconstruct"
                 resultData={parsed.raw as Record<string, unknown>}
+                originalImageUri={imageUri}
             />
         </View>
     );

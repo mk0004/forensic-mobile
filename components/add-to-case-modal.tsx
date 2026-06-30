@@ -38,9 +38,10 @@ type Props = {
     onSuccess?: (caseId: number) => void;
     modelUsed?: string;
     resultData?: Record<string, unknown>;
+    originalImageUri?: string;
 };
 
-export function AddToCaseModal({ visible, onClose, onSuccess, modelUsed, resultData }: Props) {
+export function AddToCaseModal({ visible, onClose, onSuccess, modelUsed, resultData, originalImageUri }: Props) {
     const { data: cases, isLoading: casesLoading } = useActiveCasesQuery();
     const saveEvidence = useSaveAsEvidenceMutation();
     const [search, setSearch] = useState('');
@@ -79,6 +80,7 @@ export function AddToCaseModal({ visible, onClose, onSuccess, modelUsed, resultD
                 case_id: caseId,
                 data: {
                     ...(resultData ?? {}),
+                    ...(originalImageUri ? { image_uri: originalImageUri } : {}),
                     ...(evidenceDescription.trim() ? { description: evidenceDescription.trim() } : {}),
                 },
             },

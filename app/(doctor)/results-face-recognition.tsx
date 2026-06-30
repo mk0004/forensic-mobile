@@ -489,6 +489,7 @@ export default function ResultsFaceRecognitionScreen() {
                 onClose={() => setCaseModalVisible(false)}
                 modelUsed="face"
                 resultData={parsed.raw as Record<string, unknown>}
+                originalImageUri={imageUri}
             />
         </View>
     );

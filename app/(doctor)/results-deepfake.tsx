@@ -580,6 +580,7 @@ export default function ResultsDeepfakeScreen() {
                 onClose={() => setCaseModalVisible(false)}
                 modelUsed="deepfake"
                 resultData={parsed as unknown as Record<string, unknown>}
+                originalImageUri={imageUri}
             />
         </View>
     );

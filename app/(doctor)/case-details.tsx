@@ -235,15 +235,18 @@ export default function CaseDetails() {
         const route = MODEL_RESULTS_ROUTE[analysis.modelType];
         if (!route) return;
 
+        const savedData = (analysis.mockData ?? {}) as Record<string, unknown>;
+        const savedImageUri = typeof savedData.image_uri === 'string' ? savedData.image_uri : '';
+
         if (analysis.modelType === 'deepfake') {
             router.push({
                 pathname: route as any,
-                params: { imageUri: '', apiData: JSON.stringify(analysis.mockData) },
+                params: { imageUri: savedImageUri, apiData: JSON.stringify(analysis.mockData) },
             });
         } else if (analysis.modelType === 'face') {
             router.push({
                 pathname: route as any,
-                params: { imageUri: '', apiData: JSON.stringify(analysis.mockData) },
+                params: { imageUri: savedImageUri, apiData: JSON.stringify(analysis.mockData) },
             });
         } else if (analysis.modelType === 'dna') {
             router.push({
@@ -253,7 +256,7 @@ export default function CaseDetails() {
         } else if (analysis.modelType === 'reconstruct') {
             router.push({
                 pathname: route as any,
-                params: { imageUri: '' },
+                params: { imageUri: savedImageUri },
             });
         }
     }
