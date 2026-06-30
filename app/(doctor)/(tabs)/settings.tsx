@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as Updates from 'expo-updates';
 import { AppColors, Typography, Spacing } from '@/constants/theme';
 import { DiscardChangesModal } from '@/components/ui/discard-changes-modal';
 import { useSwipeTabs } from '@/hooks/use-swipe-tabs';
@@ -767,6 +768,18 @@ export default function SettingsScreen() {
                                 <LogOutIcon />
                                 <Text style={{ fontSize: 16, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.error }}>Log Out</Text>
                             </Pressable>
+
+                            <View style={{ alignItems: 'center', paddingTop: 24, paddingBottom: 8, gap: 4 }}>
+                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_600SemiBold', color: '#9CA3AF' }}>
+                                    Forensic AI v{Updates.runtimeVersion ?? '1.0.0'}
+                                </Text>
+                                <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#9CA3AF' }}>
+                                    {`Channel: ${Updates.channel ?? 'development'} · ${Updates.isEmbeddedLaunch ? 'Embedded build' : 'OTA update'}`}
+                                </Text>
+                                <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_400Regular', color: '#C4C9D4' }}>
+                                    {`Update: ${Updates.updateId ? Updates.updateId.slice(0, 8) : 'none'}`}
+                                </Text>
+                            </View>
                         </>
                     )}
                 </ScrollView>
