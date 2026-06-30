@@ -128,6 +128,7 @@ const MODEL_RESULTS_ROUTE: Record<string, string> = {
 
 type AnalysisEvidence = {
     id: string;
+    name: string;
     modelType: string;
     modelName: string;
     date: string;
@@ -180,6 +181,7 @@ function splitEvidence(evidence: Evidence[]): { analyses: AnalysisEvidence[]; us
         if (modelType) {
             analyses.push({
                 id: String(item.id),
+                name: item.name,
                 modelType,
                 modelName: MODEL_TYPE_NAMES[modelType] ?? item.model_used,
                 date: '',
@@ -527,17 +529,19 @@ export default function CaseDetails() {
                                                 <Icon size={18} />
                                             </View>
                                             <View style={{ flex: 1, gap: 3 }}>
-                                                <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Text style={{ flexShrink: 1, fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }} numberOfLines={1}>
+                                                        {a.name}
+                                                    </Text>
+                                                    <View style={{ backgroundColor: AppColors.primary + '14', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                                                        <Text style={{ fontSize: 10, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.primary, letterSpacing: 0.3 }}>
+                                                            AI
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_400Regular', color: '#6B7280' }}>
                                                     {a.modelName}
                                                 </Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                    <Text style={{ fontSize: 12, fontFamily: 'IBMPlexSans_500Medium', color: a.verdictColor }}>
-                                                        {a.verdict}
-                                                    </Text>
-                                                    <Text style={{ fontSize: 11, fontFamily: 'IBMPlexSans_400Regular', color: '#D1D5DB' }}>
-                                                        {a.date}
-                                                    </Text>
-                                                </View>
                                             </View>
                                             <ChevronRightModelIcon size={16} />
                                         </Pressable>
