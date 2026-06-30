@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput as RNTextInput, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Image, ScrollView, Pressable, TextInput as RNTextInput, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -178,6 +178,7 @@ export default function UploadEvidence() {
         }
 
         const fileNames = files.map((f) => f.name);
+        const firstImage = files.find((f) => f.type === 'image');
         saveEvidence.mutate(
             {
                 name: trimmedName,
@@ -186,6 +187,7 @@ export default function UploadEvidence() {
                 data: {
                     description: description.trim() || 'Manual evidence upload',
                     ...(fileNames.length > 0 ? { files: fileNames } : {}),
+                    ...(firstImage ? { image_uri: firstImage.uri } : {}),
                 },
             },
             {
@@ -311,9 +313,16 @@ export default function UploadEvidence() {
                                         paddingHorizontal: 12, paddingVertical: 10, gap: 10,
                                     }}
                                 >
-                                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: AppColors.primary + '0A', alignItems: 'center', justifyContent: 'center' }}>
-                                        <FileIcon />
-                                    </View>
+                                    {file.type === 'image' ? (
+                                        <Image
+                                            source={{ uri: file.uri }}
+                                            style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#F3F4F6' }}
+                                        />
+                                    ) : (
+                                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: AppColors.primary + '0A', alignItems: 'center', justifyContent: 'center' }}>
+                                            <FileIcon />
+                                        </View>
+                                    )}
                                     <View style={{ flex: 1 }}>
                                         <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_500Medium', color: AppColors.textPrimary }} numberOfLines={1}>
                                             {file.name}

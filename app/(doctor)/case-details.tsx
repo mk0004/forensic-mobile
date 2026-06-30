@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -143,6 +143,7 @@ type UserEvidence = {
     type: string;
     date: string;
     description: string;
+    imageUri: string | null;
 };
 
 const MODEL_TYPE_NAMES: Record<string, string> = {
@@ -190,12 +191,14 @@ function splitEvidence(evidence: Evidence[]): { analyses: AnalysisEvidence[]; us
                 mockData: item.data ?? {},
             });
         } else {
+            const data = (item.data ?? {}) as Record<string, unknown>;
             userEvidence.push({
                 id: String(item.id),
                 name: item.name,
                 type: 'Evidence',
                 date: '',
                 description: '',
+                imageUri: typeof data.image_uri === 'string' ? data.image_uri : null,
             });
         }
     }
@@ -570,19 +573,26 @@ export default function CaseDetails() {
                                             gap: 12,
                                         }}
                                     >
-                                        <View style={{
-                                            width: 38,
-                                            height: 38,
-                                            borderRadius: 10,
-                                            backgroundColor: '#F3F4F6',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                        }}>
-                                            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                                                <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="#6B7280" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                                                <Path d="M14 2v6h6" stroke="#6B7280" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                                            </Svg>
-                                        </View>
+                                        {e.imageUri ? (
+                                            <Image
+                                                source={{ uri: e.imageUri }}
+                                                style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#F3F4F6' }}
+                                            />
+                                        ) : (
+                                            <View style={{
+                                                width: 38,
+                                                height: 38,
+                                                borderRadius: 10,
+                                                backgroundColor: '#F3F4F6',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}>
+                                                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                                                    <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="#6B7280" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                                                    <Path d="M14 2v6h6" stroke="#6B7280" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                                                </Svg>
+                                            </View>
+                                        )}
                                         <View style={{ flex: 1, gap: 2 }}>
                                             <Text style={{ fontSize: 13, fontFamily: 'IBMPlexSans_600SemiBold', color: AppColors.textPrimary }} numberOfLines={1}>
                                                 {e.name}
